@@ -1,4 +1,4 @@
-Status: TASK-007_COMPLETE
+Status: TASK-008_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -9,9 +9,12 @@ Completed:
 - Regex Framework (TASK-005)
 - PAN Detector (TASK-006)
 - Aadhaar Detector (TASK-007)
+- Email Detector (TASK-008)
+- Phone Detector (TASK-008)
+- UPI Detector (TASK-008)
 
 Current Task:
-TASK-008 — Contact Detectors
+TASK-009 — Fusion Engine
 
 Next:
-TASK-009 — Fusion Engine
+TASK-010 — Redaction Planner
