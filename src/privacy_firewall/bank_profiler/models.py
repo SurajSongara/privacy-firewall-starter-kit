@@ -77,10 +77,8 @@ STATEMENT_PERIOD_RES = [
 """Common patterns for statement period ranges."""
 
 ACCOUNT_HOLDER_RES = [
-    re.compile(r"(?:account\s+)?(?:holder|name)\s*[:\-]?\s*([A-Z][A-Za-z.\s]+)", re.IGNORECASE),
-    re.compile(
-        r"(?:customer|accounter)\s+(?:name|id)\s*[:\-]?\s*([A-Z][A-Za-z.\s]+)",
-        re.IGNORECASE,
-    ),
+    re.compile(r"\b[Aa]ccount\s+[Hh]older\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"),
+    re.compile(r"\b[Nn]ame\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"),
+    re.compile(r"\b[Cc]ustomer\s+[Nn]ame\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"),
 ]
 """Common patterns for account-holder name."""
