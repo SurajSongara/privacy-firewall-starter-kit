@@ -1,4 +1,4 @@
-Status: TASK-010_COMPLETE
+Status: TASK-011_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -15,9 +15,10 @@ Completed:
 - Fusion Engine (TASK-009)
 - Redaction Planner (TASK-010)
 - Docstrings added to all source files
+- PDF Renderer (TASK-011)
 
 Current Task:
-TASK-011 — PDF Renderer
+TASK-012 — CLI Commands
 
 Next:
-TASK-012 — CLI Commands
+TASK-013 — TBD
