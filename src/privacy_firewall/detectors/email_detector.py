@@ -9,14 +9,29 @@ from privacy_firewall.models.document import Document
 from privacy_firewall.models.geometry import Span
 
 EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+"""Regex matching standard email addresses per RFC 5322 simplified."""
 
 
 class EmailDetector(BaseDetector):
+    """Detector that identifies email addresses in document text."""
+
     @property
     def name(self) -> str:
+        """Human-readable detector name."""
         return "email"
 
     def scan(self, document: Document) -> list[Detection]:
+        """Scan a document for email addresses.
+
+        Iterates over all text blocks, matches against EMAIL_PATTERN, and
+        validates each candidate before yielding a Detection.
+
+        Args:
+            document: The document to scan.
+
+        Returns:
+            A list of Detection objects for each valid email address found.
+        """
         detections: list[Detection] = []
 
         for page in document.pages:
@@ -45,6 +60,14 @@ class EmailDetector(BaseDetector):
 
     @staticmethod
     def _validate_format(email: str) -> bool:
+        """Validate an email address against length and structural rules.
+
+        Args:
+            email: The email address string to validate.
+
+        Returns:
+            True if the email is structurally valid, False otherwise.
+        """
         if len(email) > 254:
             return False
         local, _, domain = email.partition("@")

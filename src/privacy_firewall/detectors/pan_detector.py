@@ -14,11 +14,26 @@ PAN_STATUS_CODES = frozenset({"P", "C", "H", "F", "A", "T", "B", "L", "J", "G"})
 
 
 class PANDetector(BaseDetector):
+    """Detector for Indian Permanent Account Number (PAN) identifiers.
+
+    Matches the standard PAN format ``ABCDE1234F`` and validates the
+    4th character against known status codes.
+    """
+
     @property
     def name(self) -> str:
+        """Human-readable detector name."""
         return "pan"
 
     def scan(self, document: Document) -> list[Detection]:
+        """Scan every text block for PAN patterns.
+
+        Args:
+            document: The document to scan.
+
+        Returns:
+            A list of Detection instances for every valid PAN found.
+        """
         detections: list[Detection] = []
 
         for page in document.pages:
@@ -47,6 +62,14 @@ class PANDetector(BaseDetector):
 
     @staticmethod
     def _validate_format(pan: str) -> bool:
+        """Verify the PAN's structure (length and status-code character).
+
+        Args:
+            pan: The 10-character PAN string to validate.
+
+        Returns:
+            ``True`` if the PAN has valid length and a recognised status code.
+        """
         if len(pan) != 10:
             return False
         status = pan[3]

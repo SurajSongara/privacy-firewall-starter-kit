@@ -1,3 +1,9 @@
+"""Detector package for identifying sensitive information in documents.
+
+Exports all built-in detector classes along with the registry, base class,
+and result types that downstream consumers use to run and collect scans.
+"""
+
 from privacy_firewall.detectors.aadhaar_detector import AadhaarDetector
 from privacy_firewall.detectors.base import BaseDetector
 from privacy_firewall.detectors.email_detector import EmailDetector
