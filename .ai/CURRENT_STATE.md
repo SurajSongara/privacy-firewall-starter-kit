@@ -1,4 +1,4 @@
-Status: TASK-005_COMPLETE
+Status: TASK-006_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -7,9 +7,10 @@ Completed:
 - PDF Parser (TASK-003)
 - Detector SDK (TASK-004)
 - Regex Framework (TASK-005)
+- PAN Detector (TASK-006)
 
 Current Task:
-TASK-006 — PAN Detector
+TASK-007 — Aadhaar Detector
 
 Next:
-TASK-007 — Aadhaar Detector
+TASK-008 — Contact Detectors
