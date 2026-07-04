@@ -9,6 +9,7 @@ from privacy_firewall.engine.fusion import (
     detector_priority,
     spans_overlap,
 )
+from privacy_firewall.engine.hybrid_merger import BlockProvenance, HybridMerger, MergeResult
 from privacy_firewall.engine.redaction import (
     Redaction,
     RedactionPlan,
@@ -17,10 +18,13 @@ from privacy_firewall.engine.redaction import (
 )
 
 __all__ = [
+    "BlockProvenance",
     "DETECTOR_TIERS",
     "FusionEngine",
     "FusionResult",
+    "HybridMerger",
     "MergeRecord",
+    "MergeResult",
     "PRIORITY_TIERS",
     "Redaction",
     "RedactionPlan",
