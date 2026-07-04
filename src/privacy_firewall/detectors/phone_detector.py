@@ -27,7 +27,7 @@ class PhoneDetector(BaseDetector):
         """Human-readable detector name."""
         return "phone"
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         """Scan a document for phone numbers.
 
         Iterates over all text blocks and all PHONE_PATTERNS, validates each
@@ -35,6 +35,8 @@ class PhoneDetector(BaseDetector):
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, use per-span bounding boxes for
+                precise value-only redaction.
 
         Returns:
             A list of Detection objects for each valid phone number found.
@@ -55,13 +57,19 @@ class PhoneDetector(BaseDetector):
                         if self._is_duplicate(detections, normalized):
                             continue
 
+                        match_bbox = (
+                            block.bbox_for_span(match.start(), match.end())
+                            if values_only
+                            else block.bbox
+                        )
+
                         detections.append(
                             Detection(
                                 detector_name=self.name,
                                 detection_type="PHONE",
                                 text=raw,
                                 span=Span(start=match.start(), end=match.end()),
-                                bbox=block.bbox,
+                                bbox=match_bbox,
                                 page_number=page.page_number,
                                 confidence=self._resolve_confidence(raw),
                             )

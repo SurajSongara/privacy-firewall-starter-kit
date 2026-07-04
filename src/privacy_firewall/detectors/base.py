@@ -18,11 +18,13 @@ class BaseDetector(ABC):
         """Human-readable detector name (e.g. ``"pan"``, ``"aadhaar"``)."""
 
     @abstractmethod
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         """Scan a document and return all detections found.
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, compute precise bounding boxes for
+                each match rather than using the full block bounding box.
 
         Returns:
             A list of Detection instances found in the document.

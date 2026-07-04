@@ -91,7 +91,8 @@ class TestPDFRenderer:
         with fitz.open(stream=result, filetype="pdf") as doc:
             assert len(doc) == 2
 
-    def test_render_bytes_black_bar(self) -> None:
+    def test_black_bar_removes_text_content(self) -> None:
+        """BLACK_BAR redaction should physically remove the text."""
         data = _make_simple_pdf()
         det = _detection()
         plan = RedactionPlan(
@@ -107,17 +108,31 @@ class TestPDFRenderer:
         )
         result = PDFRenderer.render_bytes(data, plan)
         with fitz.open(stream=result, filetype="pdf") as doc:
-            page = doc[0]
-            paths = page.get_drawings()
-            assert len(paths) >= 1
-            black_fills = [
-                p for p in paths
-                if p.get("fill") is not None
-                and all(c == 0.0 for c in p["fill"][:3])
-            ]
-            assert len(black_fills) >= 1
+            page_text = doc[0].get_text()
+        assert "ABCDE1234F" not in page_text, "Text should be removed, not just covered"
 
-    def test_render_bytes_highlight(self) -> None:
+    def test_replace_removes_text_content(self) -> None:
+        """REPLACE redaction should physically remove the text."""
+        data = _make_simple_pdf()
+        det = _detection()
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as doc:
+            page_text = doc[0].get_text()
+        assert "ABCDE1234F" not in page_text
+
+    def test_highlight_preserves_text_content(self) -> None:
+        """HIGHLIGHT should be visual-only and not remove text."""
         data = _make_simple_pdf()
         det = _detection()
         plan = RedactionPlan(
@@ -133,11 +148,11 @@ class TestPDFRenderer:
         )
         result = PDFRenderer.render_bytes(data, plan)
         with fitz.open(stream=result, filetype="pdf") as doc:
-            page = doc[0]
-            paths = page.get_drawings()
-            assert len(paths) >= 1
+            page_text = doc[0].get_text()
+        assert "ABCDE1234F" in page_text
 
-    def test_render_bytes_highlight_uses_yellow(self) -> None:
+    def test_highlight_has_yellow_overlay(self) -> None:
+        """HIGHLIGHT should add a yellow drawing."""
         data = _make_simple_pdf()
         det = _detection()
         plan = RedactionPlan(
@@ -233,10 +248,10 @@ class TestPDFRenderer:
         result = PDFRenderer.render_bytes(data, plan)
         with fitz.open(stream=result, filetype="pdf") as doc:
             assert len(doc) == 2
-            page0_paths = doc[0].get_drawings()
-            page1_paths = doc[1].get_drawings()
-            assert len(page0_paths) >= 1
-            assert len(page1_paths) >= 1
+            page0_text = doc[0].get_text()
+            page1_text = doc[1].get_text()
+            assert "AAAAAB1111B" not in page0_text
+            assert "user@test.com" not in page1_text
 
     def test_no_redactions_produces_identical_copy(self) -> None:
         data = _make_simple_pdf()
@@ -247,3 +262,34 @@ class TestPDFRenderer:
                 assert len(rendered) == len(orig)
                 for i in range(len(orig)):
                     assert rendered[i].rect == orig[i].rect
+
+    def test_mixed_redaction_types(self) -> None:
+        """Black-bar on page 1, highlight on page 2."""
+        data = _make_two_page_pdf()
+        det1 = _detection(page_number=1)
+        det2 = _detection(page_number=2)
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det1,
+                    redaction_type=RedactionType.BLACK_BAR,
+                    page_number=1,
+                    span=det1.span,
+                    bbox=det1.bbox,
+                ),
+                Redaction(
+                    detection=det2,
+                    redaction_type=RedactionType.HIGHLIGHT,
+                    page_number=2,
+                    span=det2.span,
+                    bbox=det2.bbox,
+                ),
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as doc:
+            assert len(doc) == 2
+            page0_text = doc[0].get_text()
+            page1_text = doc[1].get_text()
+            assert "AAAAAB1111B" not in page0_text
+            assert "user@test.com" in page1_text

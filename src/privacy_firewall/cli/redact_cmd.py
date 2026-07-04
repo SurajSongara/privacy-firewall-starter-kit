@@ -37,6 +37,13 @@ def redact_cmd(
             help="Detector(s) to run (repeatable). Runs all if omitted.",
         ),
     ] = None,
+    values_only: Annotated[
+        bool,
+        typer.Option(
+            "--values-only",
+            help="Redact only the matched value text, keeping labels visible.",
+        ),
+    ] = False,
 ) -> None:
     """Scan a PDF for PII and produce a redacted copy."""
     type_map: dict[str, RedactionType] = {
@@ -54,7 +61,7 @@ def redact_cmd(
     document = parser.parse()
 
     registry = _build_registry(detector)
-    result = registry.run_all(document)
+    result = registry.run_all(document, values_only=values_only)
 
     engine = FusionEngine()
     fused = engine.fuse(result.detections)

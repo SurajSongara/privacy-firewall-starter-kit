@@ -25,11 +25,13 @@ class PANDetector(BaseDetector):
         """Human-readable detector name."""
         return "pan"
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         """Scan every text block for PAN patterns.
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, use per-span bounding boxes for
+                precise value-only redaction.
 
         Returns:
             A list of Detection instances for every valid PAN found.
@@ -46,13 +48,19 @@ class PANDetector(BaseDetector):
                     if not self._validate_format(pan):
                         continue
 
+                    match_bbox = (
+                        block.bbox_for_span(match.start(), match.end())
+                        if values_only
+                        else block.bbox
+                    )
+
                     detections.append(
                         Detection(
                             detector_name=self.name,
                             detection_type="PAN",
                             text=pan,
                             span=Span(start=match.start(), end=match.end()),
-                            bbox=block.bbox,
+                            bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.95,
                         )

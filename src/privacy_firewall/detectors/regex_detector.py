@@ -57,11 +57,13 @@ class RegexDetector(BaseDetector):
         """Execution priority (higher values run first)."""
         return self._priority
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         """Scan every text block in the document for all configured patterns.
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, use per-span bounding boxes so only
+                the matched text region is redacted rather than the full block.
 
         Returns:
             A list of Detection instances for every non-rejected match.
@@ -80,13 +82,19 @@ class RegexDetector(BaseDetector):
                         if conf is None:
                             continue
 
+                        match_bbox = (
+                            block.bbox_for_span(match.start(), match.end())
+                            if values_only
+                            else block.bbox
+                        )
+
                         detections.append(
                             Detection(
                                 detector_name=self._name,
                                 detection_type=self._detection_type,
                                 text=matched_text,
                                 span=Span(start=match.start(), end=match.end()),
-                                bbox=block.bbox,
+                                bbox=match_bbox,
                                 page_number=page.page_number,
                                 confidence=conf,
                             )

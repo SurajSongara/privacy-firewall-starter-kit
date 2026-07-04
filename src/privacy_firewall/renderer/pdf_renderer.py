@@ -7,14 +7,17 @@ from typing import Any, cast
 
 import fitz
 
-from privacy_firewall.engine.redaction import Redaction, RedactionPlan, RedactionType
+from privacy_firewall.engine.redaction import RedactionPlan, RedactionType
 
 
 class PDFRenderer:
     """Applies a RedactionPlan to a PDF file, producing a redacted copy.
 
-    The original PDF is never modified. All redactions are drawn onto the
-    output copy using PyMuPDF's page drawing primitives.
+    Uses PyMuPDF's redaction annotations (``add_redact_annot`` +
+    ``apply_redactions``) to *physically remove* text and images
+    underneath each redaction region — not merely draw on top.
+
+    The original PDF is never modified.
     """
 
     BLACK_BAR_COLOR: tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -34,6 +37,9 @@ class PDFRenderer:
     ) -> Path:
         """Generate a redacted PDF copy.
 
+        Redactions are applied directly to an in-memory copy of the source
+        PDF, then saved to *output_path*. The original file is never touched.
+
         Args:
             input_path: Path to the original PDF (never modified).
             output_path: Where to write the redacted copy.
@@ -42,30 +48,12 @@ class PDFRenderer:
         Returns:
             The absolute path to the output file.
         """
-        src = fitz.open(str(input_path))
-        out = fitz.open()
-
+        doc = fitz.open(str(input_path))
         try:
-            for page_num in range(len(src)):
-                src_page = src[page_num]
-                out_page = out.new_page(
-                    width=src_page.rect.width,
-                    height=src_page.rect.height,
-                )
-                out_page.show_pdf_page(
-                    out_page.rect,
-                    src,
-                    page_num,
-                )
-
-                page_redactions = plan.by_page(page_num + 1)
-                for redaction in page_redactions:
-                    self._apply_redaction(out_page, redaction)
-
-            out.save(str(output_path))
+            self._apply_plan(doc, plan)
+            doc.save(str(output_path))
         finally:
-            src.close()
-            out.close()
+            doc.close()
 
         return Path(output_path).resolve()
 
@@ -80,60 +68,54 @@ class PDFRenderer:
         Returns:
             Raw bytes of the redacted PDF.
         """
-        src = fitz.open(stream=data, filetype="pdf")
-        out = fitz.open()
-
+        doc = fitz.open(stream=data, filetype="pdf")
         try:
-            for page_num in range(len(src)):
-                src_page = src[page_num]
-                out_page = out.new_page(
-                    width=src_page.rect.width,
-                    height=src_page.rect.height,
-                )
-                out_page.show_pdf_page(
-                    out_page.rect,
-                    src,
-                    page_num,
-                )
-
-                page_redactions = plan.by_page(page_num + 1)
-                for redaction in page_redactions:
-                    PDFRenderer._apply_redaction(out_page, redaction)
-
-            result = cast(bytes, out.tobytes())
+            PDFRenderer._apply_plan(doc, plan)
+            result = cast(bytes, doc.tobytes())
         finally:
-            src.close()
-            out.close()
+            doc.close()
 
         return result
 
     @staticmethod
-    def _apply_redaction(page: Any, redaction: Redaction) -> None:
-        """Draw a redaction annotation onto a single page.
+    def _apply_plan(doc: Any, plan: RedactionPlan) -> None:
+        """Apply every redaction in the plan to the open PyMuPDF document.
+
+        For REPLACE / BLACK_BAR redactions this uses
+        ``add_redact_annot`` + ``apply_redactions``, which physically
+        strips the underlying text/images.  HIGHLIGHT redactions use
+        ``draw_rect`` (visual-only).
 
         Args:
-            page: A PyMuPDF Page object.
-            redaction: The redaction instruction to apply.
+            doc: An open PyMuPDF document.
+            plan: The redaction plan to apply.
         """
-        rect = fitz.Rect(
-            redaction.bbox.x0,
-            redaction.bbox.y0,
-            redaction.bbox.x1,
-            redaction.bbox.y1,
-        )
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            page_redactions = plan.by_page(page_num + 1)
+            if not page_redactions:
+                continue
 
-        if redaction.redaction_type in (RedactionType.REPLACE, RedactionType.BLACK_BAR):
-            page.draw_rect(
-                rect,
-                color=None,
-                fill=PDFRenderer.BLACK_BAR_COLOR,
-                width=0,
-            )
-        elif redaction.redaction_type == RedactionType.HIGHLIGHT:
-            page.draw_rect(
-                rect,
-                color=None,
-                fill=PDFRenderer.HIGHLIGHT_COLOR,
-                fill_opacity=PDFRenderer.HIGHLIGHT_OPACITY,
-                width=0,
-            )
+            has_destructive = False
+            for redaction in page_redactions:
+                rect = fitz.Rect(
+                    redaction.bbox.x0,
+                    redaction.bbox.y0,
+                    redaction.bbox.x1,
+                    redaction.bbox.y1,
+                )
+
+                if redaction.redaction_type in (RedactionType.REPLACE, RedactionType.BLACK_BAR):
+                    page.add_redact_annot(rect, fill=PDFRenderer.BLACK_BAR_COLOR)
+                    has_destructive = True
+                elif redaction.redaction_type == RedactionType.HIGHLIGHT:
+                    page.draw_rect(
+                        rect,
+                        color=None,
+                        fill=PDFRenderer.HIGHLIGHT_COLOR,
+                        fill_opacity=PDFRenderer.HIGHLIGHT_OPACITY,
+                        width=0,
+                    )
+
+            if has_destructive:
+                page.apply_redactions()
