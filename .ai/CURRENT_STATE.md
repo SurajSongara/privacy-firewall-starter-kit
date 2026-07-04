@@ -1,4 +1,4 @@
-Status: TASK-012_COMPLETE
+Status: TASK-014_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -14,10 +14,11 @@ Completed:
 - Redaction Planner (TASK-010)
 - PDF Renderer — black bar + highlight (TASK-011)
 - CLI Commands — scan, detect, redact (TASK-012)
-- Docstrings added to all source files
+- --values-only flag for precise value-level redaction (TASK-013)
+- Golden Dataset — examples/ with benchmark structure + ground truth (TASK-014)
 
 Current Task:
-None — all 12 spec tasks complete
+None
 
 Next:
-TASK-013 — TBD
+TASK-015 — Project Review

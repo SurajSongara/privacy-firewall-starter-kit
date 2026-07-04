@@ -24,3 +24,4 @@ gh_auth*.txt
 
 *.pdf
 !tests/**/*.pdf
+!examples/**/*.pdf

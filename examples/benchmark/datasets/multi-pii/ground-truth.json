@@ -1,0 +1,42 @@
+{
+  "document": "benchmark/datasets/multi-pii/document.pdf",
+  "description": "Multi-page document with repeated PII values across pages",
+  "expectations": [
+    {
+      "detection_type": "AADHAAR",
+      "text": "123456789012",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "PAN",
+      "text": "ABCPA5678J",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "UPI",
+      "text": "john.m@okhdfcbank",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "+91-9988776655",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "PAN",
+      "text": "FGHLA9012P",
+      "page_number": 2,
+      "count": 1
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "billing@client.in",
+      "page_number": 2,
+      "count": 1
+    }
+  ]
+}
