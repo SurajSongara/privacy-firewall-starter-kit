@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from privacy_firewall.models.blocks import Block
 
 
-class Page(BaseModel, frozen=True):
+class Page(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     page_number: int
     width: float
     height: float
@@ -36,5 +38,7 @@ class Page(BaseModel, frozen=True):
         return v
 
 
-class Document(BaseModel, frozen=True):
+class Document(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     pages: list[Page] = []

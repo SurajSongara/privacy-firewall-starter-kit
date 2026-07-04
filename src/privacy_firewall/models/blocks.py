@@ -14,7 +14,9 @@ class BlockType(StrEnum):
     TABLE = "table"
 
 
-class Block(BaseModel, frozen=True):
+class Block(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     block_id: str
     block_type: BlockType
     bbox: BoundingBox
@@ -38,20 +40,23 @@ class Block(BaseModel, frozen=True):
         return v
 
 
-class TextBlock(Block):  # type: ignore[misc]
+class TextBlock(Block):
     model_config = ConfigDict(frozen=True)
+
     block_type: Literal[BlockType.TEXT] = BlockType.TEXT
     text: str
 
 
-class ImageBlock(Block):  # type: ignore[misc]
+class ImageBlock(Block):
     model_config = ConfigDict(frozen=True)
+
     block_type: Literal[BlockType.IMAGE] = BlockType.IMAGE
     image_data: bytes | None = None
     mime_type: str | None = None
 
 
-class TableBlock(Block):  # type: ignore[misc]
+class TableBlock(Block):
     model_config = ConfigDict(frozen=True)
+
     block_type: Literal[BlockType.TABLE] = BlockType.TABLE
     rows: list[list[str]] = []
