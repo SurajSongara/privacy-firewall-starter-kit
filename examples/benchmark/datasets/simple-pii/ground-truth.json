@@ -1,0 +1,36 @@
+{
+  "document": "benchmark/datasets/simple-pii/document.pdf",
+  "description": "Single page with one of each PII type",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "AAAAA1111A",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "234567890123",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "jane.smith@example.com",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "+91-9876543210",
+      "page_number": 1,
+      "count": 1
+    },
+    {
+      "detection_type": "UPI",
+      "text": "jane@paytm",
+      "page_number": 1,
+      "count": 1
+    }
+  ]
+}

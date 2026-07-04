@@ -1,0 +1,5 @@
+{
+  "document": "benchmark/datasets/no-pii/document.pdf",
+  "description": "Clean document with no PII \u2014 should produce zero detections",
+  "expectations": []
+}

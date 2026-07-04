@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from privacy_firewall.detectors.base import BaseDetector
+from privacy_firewall.detectors.utils import is_exact_duplicate
 from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
@@ -48,7 +49,7 @@ class AadhaarDetector(BaseDetector):
                     normalized = re.sub(r"[\s-]", "", raw)
                     if not self._validate_format(normalized):
                         continue
-                    if self._is_duplicate(detections, normalized):
+                    if is_exact_duplicate(detections, normalized):
                         continue
 
                     match_bbox = (
@@ -73,7 +74,7 @@ class AadhaarDetector(BaseDetector):
                     normalized = match.group()
                     if not self._validate_format(normalized):
                         continue
-                    if self._is_duplicate(detections, normalized):
+                    if is_exact_duplicate(detections, normalized):
                         continue
 
                     match_bbox = (
@@ -112,15 +113,4 @@ class AadhaarDetector(BaseDetector):
             return False
         return True
 
-    @staticmethod
-    def _is_duplicate(detections: list[Detection], text: str) -> bool:
-        """Check if an Aadhaar text already exists in the result list.
 
-        Args:
-            detections: The current list of detections.
-            text: The Aadhaar text to check for.
-
-        Returns:
-            ``True`` if *text* is already present among the detections.
-        """
-        return any(d.text == text for d in detections)

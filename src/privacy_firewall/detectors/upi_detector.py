@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from privacy_firewall.detectors.base import BaseDetector
+from privacy_firewall.detectors.utils import is_exact_duplicate
 from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
@@ -78,7 +79,7 @@ class UpiDetector(BaseDetector):
                     upi_id = match.group()
                     if not self._validate_format(upi_id):
                         continue
-                    if self._is_duplicate(detections, upi_id):
+                    if is_exact_duplicate(detections, upi_id):
                         continue
 
                     match_bbox = (
@@ -140,15 +141,4 @@ class UpiDetector(BaseDetector):
             return 0.95
         return 0.7
 
-    @staticmethod
-    def _is_duplicate(detections: list[Detection], upi_id: str) -> bool:
-        """Check if a UPI ID already exists in the detections list.
 
-        Args:
-            detections: The list of detections collected so far.
-            upi_id: The candidate UPI ID.
-
-        Returns:
-            True if the UPI ID is already present.
-        """
-        return any(d.text == upi_id for d in detections)
