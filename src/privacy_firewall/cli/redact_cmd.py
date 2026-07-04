@@ -7,8 +7,8 @@ import typer
 
 from privacy_firewall.cli.detect_cmd import _build_registry
 from privacy_firewall.engine.fusion import FusionEngine
+from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 from privacy_firewall.engine.redaction import RedactionPlanner, RedactionType
-from privacy_firewall.parsers.pdf_parser import PDFParser
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
 
 
@@ -44,6 +44,14 @@ def redact_cmd(
             help="Redact only the matched value text, keeping labels visible.",
         ),
     ] = False,
+    ocr: Annotated[
+        bool,
+        typer.Option("--ocr", help="Run OCR and merge with native text."),
+    ] = False,
+    auto: Annotated[
+        bool,
+        typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
+    ] = False,
 ) -> None:
     """Scan a PDF for PII and produce a redacted copy."""
     type_map: dict[str, RedactionType] = {
@@ -57,8 +65,7 @@ def redact_cmd(
         msg = f"Unknown redaction type: {redaction_type!r}. Choose from: {choices}"
         raise typer.BadParameter(msg)
 
-    parser = PDFParser(input_pdf)
-    document = parser.parse()
+    document, source = get_merged_document(input_pdf, force_ocr=ocr, auto=auto)
 
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)
@@ -72,5 +79,6 @@ def redact_cmd(
     renderer = PDFRenderer()
     out_path = renderer.render(input_pdf, output_pdf, plan)
 
+    typer.echo(f"Pipeline: {get_pipeline_summary(source)}")
     typer.echo(f"Redacted PDF saved to: {out_path}")
     typer.echo(f"Redactions applied: {plan.total_redactions}")

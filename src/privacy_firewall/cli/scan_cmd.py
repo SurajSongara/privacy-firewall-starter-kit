@@ -5,8 +5,8 @@ from typing import Annotated
 
 import typer
 
+from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 from privacy_firewall.models.blocks import ImageBlock, TextBlock
-from privacy_firewall.parsers.pdf_parser import PDFParser
 
 
 def scan_cmd(
@@ -14,11 +14,19 @@ def scan_cmd(
         Path,
         typer.Argument(help="Path to the PDF file to scan.", exists=True, dir_okay=False),
     ],
+    ocr: Annotated[
+        bool,
+        typer.Option("--ocr", help="Run OCR and merge with native text."),
+    ] = False,
+    auto: Annotated[
+        bool,
+        typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
+    ] = False,
 ) -> None:
     """Parse a PDF and display its structure (pages, blocks, text previews)."""
-    parser = PDFParser(input_pdf)
-    document = parser.parse()
+    document, source = get_merged_document(input_pdf, force_ocr=ocr, auto=auto)
 
+    typer.echo(f"Pipeline: {get_pipeline_summary(source)}")
     typer.echo(f"Pages: {len(document.pages)}")
     for page in document.pages:
         typer.echo(f"Page {page.page_number} ({page.width:.0f} x {page.height:.0f}):")

@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from benchmarks.generate_benchmarks import generate_all
-from benchmarks.runner import BenchmarkExpectation, BENCHMARKS, run_benchmark
+from benchmarks.runner import BENCHMARKS, BenchmarkExpectation, run_benchmark
 
 
 @pytest.fixture(scope="session", autouse=True)

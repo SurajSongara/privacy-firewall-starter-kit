@@ -14,7 +14,7 @@ from privacy_firewall.detectors import (
     UpiDetector,
 )
 from privacy_firewall.engine.fusion import FusionEngine
-from privacy_firewall.parsers.pdf_parser import PDFParser
+from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 
 
 def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
@@ -69,10 +69,17 @@ def detect_cmd(
             help="Use per-span bounding boxes (shows precise match regions).",
         ),
     ] = False,
+    ocr: Annotated[
+        bool,
+        typer.Option("--ocr", help="Run OCR and merge with native text."),
+    ] = False,
+    auto: Annotated[
+        bool,
+        typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
+    ] = False,
 ) -> None:
     """Run PII detectors on a PDF and list all detections found."""
-    parser = PDFParser(input_pdf)
-    document = parser.parse()
+    document, source = get_merged_document(input_pdf, force_ocr=ocr, auto=auto)
 
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)
@@ -83,6 +90,7 @@ def detect_cmd(
         fused = engine.fuse(detections)
         detections = fused.detections
 
+    typer.echo(f"Pipeline: {get_pipeline_summary(source)}")
     typer.echo(f"Detections ({len(detections)}):")
     for i, d in enumerate(detections, start=1):
         typer.echo(
