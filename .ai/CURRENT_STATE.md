@@ -1,4 +1,4 @@
-Status: TASK-006_COMPLETE
+Status: TASK-007_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -8,9 +8,10 @@ Completed:
 - Detector SDK (TASK-004)
 - Regex Framework (TASK-005)
 - PAN Detector (TASK-006)
+- Aadhaar Detector (TASK-007)
 
 Current Task:
-TASK-007 — Aadhaar Detector
+TASK-008 — Contact Detectors
 
 Next:
-TASK-008 — Contact Detectors
+TASK-009 — Fusion Engine
