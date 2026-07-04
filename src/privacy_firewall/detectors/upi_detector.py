@@ -9,6 +9,7 @@ from privacy_firewall.models.document import Document
 from privacy_firewall.models.geometry import Span
 
 UPI_PATTERN = re.compile(r"[a-zA-Z0-9._-]+@[a-zA-Z][a-zA-Z0-9._-]*")
+"""Regex matching UPI ID format (local@handle)."""
 
 KNOWN_UPI_HANDLES: frozenset[str] = frozenset(
     {
@@ -41,14 +42,29 @@ KNOWN_UPI_HANDLES: frozenset[str] = frozenset(
         "federal",
     }
 )
+"""Known UPI payment-service provider handles used for confidence scoring."""
 
 
 class UpiDetector(BaseDetector):
+    """Detector that identifies UPI payment IDs in document text."""
+
     @property
     def name(self) -> str:
+        """Human-readable detector name."""
         return "upi"
 
     def scan(self, document: Document) -> list[Detection]:
+        """Scan a document for UPI IDs.
+
+        Iterates over all text blocks, matches against UPI_PATTERN, validates
+        each candidate, deduplicates, and yields a Detection.
+
+        Args:
+            document: The document to scan.
+
+        Returns:
+            A list of Detection objects for each valid UPI ID found.
+        """
         detections: list[Detection] = []
 
         for page in document.pages:
@@ -79,6 +95,14 @@ class UpiDetector(BaseDetector):
 
     @staticmethod
     def _validate_format(upi_id: str) -> bool:
+        """Validate a UPI ID for length and structural rules.
+
+        Args:
+            upi_id: The UPI ID string to validate.
+
+        Returns:
+            True if the UPI ID is structurally valid, False otherwise.
+        """
         if len(upi_id) > 50:
             return False
         if ".." in upi_id or "@@" in upi_id:
@@ -95,6 +119,14 @@ class UpiDetector(BaseDetector):
 
     @staticmethod
     def _resolve_confidence(upi_id: str) -> float:
+        """Return a confidence score based on whether the handle is known.
+
+        Args:
+            upi_id: The UPI ID string.
+
+        Returns:
+            A confidence float between 0.0 and 1.0.
+        """
         handle = upi_id.split("@", 1)[1] if "@" in upi_id else ""
         if handle in KNOWN_UPI_HANDLES:
             return 0.95
@@ -102,4 +134,13 @@ class UpiDetector(BaseDetector):
 
     @staticmethod
     def _is_duplicate(detections: list[Detection], upi_id: str) -> bool:
+        """Check if a UPI ID already exists in the detections list.
+
+        Args:
+            detections: The list of detections collected so far.
+            upi_id: The candidate UPI ID.
+
+        Returns:
+            True if the UPI ID is already present.
+        """
         return any(d.text == upi_id for d in detections)

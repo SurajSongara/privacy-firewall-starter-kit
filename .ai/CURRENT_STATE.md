@@ -1,4 +1,4 @@
-Status: TASK-008_COMPLETE
+Status: TASK-010_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -12,9 +12,12 @@ Completed:
 - Email Detector (TASK-008)
 - Phone Detector (TASK-008)
 - UPI Detector (TASK-008)
+- Fusion Engine (TASK-009)
+- Redaction Planner (TASK-010)
+- Docstrings added to all source files
 
 Current Task:
-TASK-009 — Fusion Engine
+TASK-011 — PDF Renderer
 
 Next:
-TASK-010 — Redaction Planner
+TASK-012 — CLI Commands

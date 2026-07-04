@@ -1,3 +1,5 @@
+"""Detection-fusion logic: priority-based merging of overlapping detections."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -23,16 +25,43 @@ DETECTOR_TIERS: dict[str, str] = {
 
 
 def detector_priority(detector_name: str) -> int:
+    """Return the numeric priority for a given detector name.
+
+    Higher numbers indicate higher priority.
+
+    Args:
+        detector_name: Name of the detector (e.g. ``"pan"``, ``"email"``).
+
+    Returns:
+        Numeric priority value.
+    """
     tier = DETECTOR_TIERS.get(detector_name, "heuristic")
     return PRIORITY_TIERS.get(tier, 0)
 
 
 def spans_overlap(a: Span, b: Span) -> bool:
+    """Check whether two character spans overlap in the same document.
+
+    Args:
+        a: First span.
+        b: Second span.
+
+    Returns:
+        True if the spans overlap.
+    """
     return a.start < b.end and b.start < a.end
 
 
 @dataclass
 class MergeRecord:
+    """Records the outcome of merging one detection into another.
+
+    Attributes:
+        kept: The detection that was kept after merging.
+        merged: The detections that were merged into the kept one.
+        reason: Human-readable explanation for why this merge happened.
+    """
+
     kept: Detection
     merged: list[Detection]
     reason: str
@@ -40,12 +69,29 @@ class MergeRecord:
 
 @dataclass
 class FusionResult:
+    """Result produced by the fusion engine after merging overlapping detections.
+
+    Attributes:
+        detections: The fused (deduplicated) list of detections.
+        merge_log: Log of every merge operation that was performed.
+    """
+
     detections: list[Detection]
     merge_log: list[MergeRecord] = field(default_factory=list)
 
 
 class FusionEngine:
+    """Merges overlapping detections by priority tier and confidence."""
+
     def fuse(self, detections: list[Detection]) -> FusionResult:
+        """Merge overlapping detections grouped by page and detection type.
+
+        Args:
+            detections: Raw list of detections to fuse.
+
+        Returns:
+            A FusionResult containing the deduplicated detections and merge log.
+        """
         log: list[MergeRecord] = []
 
         groups: dict[tuple[int, str], list[Detection]] = {}
@@ -65,6 +111,18 @@ class FusionEngine:
     def _merge_group(
         group: list[Detection], log: list[MergeRecord]
     ) -> list[Detection]:
+        """Merge a single group of same-type detections from the same page.
+
+        Detections are sorted by span start, then priority, then confidence.
+        Overlapping neighbours are resolved and logged.
+
+        Args:
+            group: Detections sharing the same page and detection type.
+            log: Accumulator for merge records.
+
+        Returns:
+            The merged list of detections.
+        """
         sorted_detections = sorted(
             group,
             key=lambda d: (d.span.start, -detector_priority(d.detector_name), -d.confidence),
@@ -89,6 +147,17 @@ class FusionEngine:
 
 
 def _resolve(a: Detection, b: Detection) -> tuple[Detection, Detection]:
+    """Resolve two overlapping detections by choosing the higher-priority one.
+
+    Priority is determined first by detector tier, then by confidence.
+
+    Args:
+        a: First detection.
+        b: Second detection.
+
+    Returns:
+        A tuple ``(winner, loser)``.
+    """
     a_pri = detector_priority(a.detector_name)
     b_pri = detector_priority(b.detector_name)
     if a_pri > b_pri:
@@ -101,6 +170,15 @@ def _resolve(a: Detection, b: Detection) -> tuple[Detection, Detection]:
 
 
 def _merge_reason(winner: Detection, loser: Detection) -> str:
+    """Generate a human-readable reason explaining why winner beat loser.
+
+    Args:
+        winner: The detection that was kept.
+        loser: The detection that was merged away.
+
+    Returns:
+        A short string describing the merge rationale.
+    """
     winner_pri = detector_priority(winner.detector_name)
     loser_pri = detector_priority(loser.detector_name)
     if winner_pri > loser_pri:

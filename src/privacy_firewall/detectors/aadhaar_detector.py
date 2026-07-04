@@ -13,11 +13,27 @@ AADHAAR_FORMATTED = re.compile(r"(?<!\d)\d{4}[\s-]?\d{4}[\s-]?\d{4}(?!\d)")
 
 
 class AadhaarDetector(BaseDetector):
+    """Detector for Indian Aadhaar (12-digit) identifiers.
+
+    Matches both formatted (``1234 5678 9012`` / ``1234-5678-9012``)
+    and continuous (``123456789012``) representations, normalises them,
+    and deduplicates results.
+    """
+
     @property
     def name(self) -> str:
+        """Human-readable detector name."""
         return "aadhaar"
 
     def scan(self, document: Document) -> list[Detection]:
+        """Scan every text block for Aadhaar patterns.
+
+        Args:
+            document: The document to scan.
+
+        Returns:
+            A list of Detection instances for every unique valid Aadhaar.
+        """
         detections: list[Detection] = []
 
         for page in document.pages:
@@ -68,6 +84,14 @@ class AadhaarDetector(BaseDetector):
 
     @staticmethod
     def _validate_format(aadhaar: str) -> bool:
+        """Verify the Aadhaar string is exactly 12 digits.
+
+        Args:
+            aadhaar: The normalised Aadhaar string to validate.
+
+        Returns:
+            ``True`` if the string is 12 digits long.
+        """
         if len(aadhaar) != 12:
             return False
         if not aadhaar.isdigit():
@@ -76,4 +100,13 @@ class AadhaarDetector(BaseDetector):
 
     @staticmethod
     def _is_duplicate(detections: list[Detection], text: str) -> bool:
+        """Check if an Aadhaar text already exists in the result list.
+
+        Args:
+            detections: The current list of detections.
+            text: The Aadhaar text to check for.
+
+        Returns:
+            ``True`` if *text* is already present among the detections.
+        """
         return any(d.text == text for d in detections)

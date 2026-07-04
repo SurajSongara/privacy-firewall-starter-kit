@@ -1,3 +1,5 @@
+"""Entry-point module for the privacy-firewall CLI."""
+
 from typing import Annotated
 
 import typer
@@ -16,6 +18,12 @@ def callback(
         bool, typer.Option("--version", help="Show the version and exit.")
     ] = False,
 ) -> None:
+    """CLI callback that shows version info or the default banner.
+
+    Args:
+        ctx: The Typer context.
+        version_flag: When True, prints the installed package version and exits.
+    """
     if version_flag:
         from importlib.metadata import version
 
@@ -26,6 +34,7 @@ def callback(
 
 
 def entry_point() -> None:
+    """Console-script entry point that runs the Typer application."""
     app()
 
 

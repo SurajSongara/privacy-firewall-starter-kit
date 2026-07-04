@@ -13,6 +13,12 @@ ValidationHook = Callable[[str], float | None]
 
 
 class RegexDetector(BaseDetector):
+    """Detector that scans document text using compiled regex patterns.
+
+    Each match can optionally be passed through a validation hook that may
+    adjust the confidence score or reject the match entirely.
+    """
+
     def __init__(
         self,
         name: str,
@@ -23,6 +29,17 @@ class RegexDetector(BaseDetector):
         confidence: float = 1.0,
         priority: int = 0,
     ) -> None:
+        """Initialise the regex detector.
+
+        Args:
+            name: Unique detector name.
+            detection_type: Type label attached to every detection (e.g. ``"PAN"``).
+            patterns: Compiled regex patterns to search for.
+            validate: Optional hook that receives matched text and returns a
+                confidence score, or ``None`` to reject the match.
+            confidence: Default confidence when *validate* is not supplied.
+            priority: Execution priority (higher runs first).
+        """
         self._name = name
         self._detection_type = detection_type
         self._patterns = patterns
@@ -32,13 +49,23 @@ class RegexDetector(BaseDetector):
 
     @property
     def name(self) -> str:
+        """Human-readable detector name."""
         return self._name
 
     @property
     def priority(self) -> int:
+        """Execution priority (higher values run first)."""
         return self._priority
 
     def scan(self, document: Document) -> list[Detection]:
+        """Scan every text block in the document for all configured patterns.
+
+        Args:
+            document: The document to scan.
+
+        Returns:
+            A list of Detection instances for every non-rejected match.
+        """
         detections: list[Detection] = []
 
         for page in document.pages:
@@ -68,6 +95,17 @@ class RegexDetector(BaseDetector):
         return detections
 
     def _resolve_confidence(self, matched_text: str) -> float | None:
+        """Determine the confidence score for a matched piece of text.
+
+        If a validation hook is registered it is called; otherwise the
+        detector-level default confidence is returned.
+
+        Args:
+            matched_text: The text that matched a regex pattern.
+
+        Returns:
+            A confidence score, or ``None`` if the match should be rejected.
+        """
         if self._validate is not None:
             result = self._validate(matched_text)
             if result is None:
