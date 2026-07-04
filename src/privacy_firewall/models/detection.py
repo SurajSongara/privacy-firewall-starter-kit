@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from privacy_firewall.models.geometry import BoundingBox, Span
 
 
-class Detection(BaseModel, frozen=True):
+class Detection(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     detector_name: str
     detection_type: str
     text: str
