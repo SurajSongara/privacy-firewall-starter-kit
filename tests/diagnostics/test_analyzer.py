@@ -4,7 +4,12 @@ from __future__ import annotations
 import fitz
 import pytest
 
-from privacy_firewall.diagnostics import DiagnosticReport, DocumentAnalyzer, PipelineType
+from privacy_firewall.diagnostics import (
+    DiagnosticReport,
+    DocumentAnalyzer,
+    PipelineType,
+    TextQualityAnalyzer,
+)
 
 
 @pytest.fixture
@@ -104,17 +109,17 @@ class TestDocumentAnalyzer:
             report.page_count = 99  # type: ignore[misc]
 
     def test_no_text_quality(self) -> None:
-        assert DocumentAnalyzer._score_text_quality("") == 0.0
+        assert TextQualityAnalyzer.analyze("").overall_score == 0.0
 
     def test_perfect_text_quality(self) -> None:
         text = "Hello world. This is a normal sentence with good quality text."
-        score = DocumentAnalyzer._score_text_quality(text)
+        score = TextQualityAnalyzer.analyze(text).overall_score
         assert score > 0.9
 
     def test_replacement_char_penalty(self) -> None:
         text = "\ufffd" * 50
-        score = DocumentAnalyzer._score_text_quality(text)
-        assert score < 0.5
+        report = TextQualityAnalyzer.analyze(text)
+        assert report.overall_score < 0.5
 
     def test_estimate_scanned_high_images(self) -> None:
         assert DocumentAnalyzer._estimate_scanned(1, 5, 0.0) is True

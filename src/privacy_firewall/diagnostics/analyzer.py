@@ -1,25 +1,20 @@
 """PDF document analyser that produces diagnostic reports."""
-
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
 import fitz
 
 from privacy_firewall.diagnostics.models import DiagnosticReport, PipelineType
-
-_REPLACEMENT_CHAR = "\ufffd"
-_PRINTABLE_RE = re.compile(r"[^\x00-\x1f\x7f-\x9f\ufffd]")
-_WORD_SPLIT_RE = re.compile(r"\S+")
+from privacy_firewall.diagnostics.text_quality import TextQualityAnalyzer
 
 
 class DocumentAnalyzer:
     """Inspects a PDF file and produces a structured diagnostic report.
 
     The analyser opens the document with PyMuPDF, runs a series of checks
-    (text presence, image count, rotation, encryption, …), scores the
+    (text presence, image count, rotation, encryption, ...), scores the
     quality of any extractable text, and recommends a processing pipeline.
     """
 
@@ -113,7 +108,8 @@ class DocumentAnalyzer:
                 file_path, page_count, total_images, rotated_pages,
             )
 
-        quality = DocumentAnalyzer._score_text_quality(all_text)
+        tqr = TextQualityAnalyzer.analyze(all_text)
+        quality = tqr.overall_score
         est_scanned = DocumentAnalyzer._estimate_scanned(
             page_count, total_images, quality,
         )
@@ -128,7 +124,7 @@ class DocumentAnalyzer:
             has_native_text=has_text,
             rotated_pages=rotated_pages,
             estimated_scanned=est_scanned,
-            text_quality_score=round(quality, 4),
+            text_quality_report=tqr,
             recommended_pipeline=pipeline,
         )
 
@@ -159,51 +155,8 @@ class DocumentAnalyzer:
             image_count=image_count,
             rotated_pages=rotated_pages,
             estimated_scanned=est_scanned,
-            text_quality_score=0.0,
             recommended_pipeline=PipelineType.OCR,
         )
-
-    @staticmethod
-    def _score_text_quality(text: str) -> float:
-        """Score text quality on a 0-1 scale using basic heuristics.
-
-        Penalises:
-        - High ratio of non-printable / replacement characters.
-        - Overly short words (indicates fragmentation).
-        - Very long unbroken tokens (indicates missing spaces).
-
-        Args:
-            text: The full page text to evaluate.
-
-        Returns:
-            A quality score in ``[0.0, 1.0]``.
-        """
-        if not text:
-            return 0.0
-
-        char_count = len(text)
-        if char_count == 0:
-            return 0.0
-
-        printable_matches = _PRINTABLE_RE.findall(text)
-        printable_count = len(printable_matches)
-        printable_ratio = printable_count / char_count
-
-        replace_count = text.count(_REPLACEMENT_CHAR)
-        replace_penalty = 1.0 - (replace_count / max(char_count, 1)) * 5
-        replace_penalty = max(0.0, replace_penalty)
-
-        words = _WORD_SPLIT_RE.findall(text)
-        if words:
-            long_tokens = sum(1 for w in words if len(w) > 50)
-            long_penalty = 1.0 - (long_tokens / len(words)) * 10
-            long_penalty = max(0.0, long_penalty)
-        else:
-            long_penalty = 1.0
-
-        quality = printable_ratio * 0.5 + replace_penalty * 0.25 + long_penalty * 0.25
-        quality = max(0.0, min(1.0, quality))
-        return quality
 
     @staticmethod
     def _estimate_scanned(page_count: int, image_count: int, quality: float) -> bool:

@@ -135,6 +135,32 @@ def test_detect_rejects_missing_file() -> None:
     assert result.exit_code != 0
 
 
+# --- diagnostics command ---
+
+
+def test_diagnostics_help() -> None:
+    result = runner.invoke(app, ["diagnostics", "--help"])
+    assert result.exit_code == 0
+    assert "diagnostics" in result.stdout
+
+
+def test_diagnostics_shows_report(tmp_path: str) -> None:
+    pdf = _make_pdf()
+    path = f"{tmp_path}/test.pdf"
+    with open(path, "wb") as f:
+        f.write(pdf)
+    result = runner.invoke(app, ["diagnostics", path])
+    assert result.exit_code == 0
+    assert "Pages:" in result.stdout
+    assert "Pipeline:" in result.stdout
+    assert "Text Quality" in result.stdout or "text quality" in result.stdout.lower()
+
+
+def test_diagnostics_rejects_missing_file() -> None:
+    result = runner.invoke(app, ["diagnostics", "nonexistent.pdf"])
+    assert result.exit_code != 0
+
+
 # --- redact command ---
 
 
