@@ -13,6 +13,7 @@ from privacy_firewall.detectors.regex_detector import RegexDetector
 from privacy_firewall.detectors.registry import DetectorRegistry
 from privacy_firewall.detectors.result import DetectionResult, DetectorRun, timed_scan
 from privacy_firewall.detectors.upi_detector import UpiDetector
+from privacy_firewall.detectors.utils import is_containment_duplicate, is_exact_duplicate
 
 __all__ = [
     "AadhaarDetector",
@@ -24,6 +25,8 @@ __all__ = [
     "PANDetector",
     "PhoneDetector",
     "RegexDetector",
+    "is_containment_duplicate",
+    "is_exact_duplicate",
     "timed_scan",
     "UpiDetector",
 ]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from privacy_firewall.detectors.base import BaseDetector
+from privacy_firewall.detectors.utils import is_containment_duplicate
 from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
@@ -54,7 +55,7 @@ class PhoneDetector(BaseDetector):
                         if not self._validate_phone(raw):
                             continue
                         normalized = re.sub(r"[^\d]", "", raw)
-                        if self._is_duplicate(detections, normalized):
+                        if is_containment_duplicate(detections, normalized):
                             continue
 
                         match_bbox = (
@@ -111,21 +112,4 @@ class PhoneDetector(BaseDetector):
             return 0.9
         return 0.7
 
-    @staticmethod
-    def _is_duplicate(detections: list[Detection], normalized: str) -> bool:
-        """Check if a normalized phone number already exists in detections.
 
-        Uses substring matching to catch overlapping or reformatted numbers.
-
-        Args:
-            detections: The list of detections collected so far.
-            normalized: The digits-only representation of the candidate.
-
-        Returns:
-            True if the candidate is considered a duplicate.
-        """
-        for d in detections:
-            existing = re.sub(r"[^\d]", "", d.text)
-            if normalized in existing or existing in normalized:
-                return True
-        return False
