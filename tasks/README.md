@@ -9,7 +9,7 @@ Delivered:
 - CLI (scan/detect/redact), destructive redaction, values-only mode
 - 231 tests, ruff clean, mypy clean
 
-## Phase 2 — Ingestion Robustness
+## Phase 2 — Ingestion Robustness (Complete ✅)
 
 Focus on document robustness before adding more detectors.
 
@@ -17,16 +17,26 @@ Principles: Diagnose first → OCR only when needed → Preserve layout → Benc
 
 | # | Task | Status |
 |---|------|--------|
-| R001 | Document Diagnostics | Pending |
-| R002 | Text Quality Heuristics | Pending |
-| R003 | Pipeline Selector | Pending |
-| R004 | OCR Provider Interface | Pending |
-| R005 | PaddleOCR Integration | Pending |
-| R006 | Hybrid Merge | Pending |
-| R007 | Layout Analyzer | Pending |
-| R008 | Bank Profile | Pending |
-| R009 | Doctor CLI | Pending |
-| R010 | Regression Suite | Pending |
+| R001 | Document Diagnostics | ✅ Complete |
+| R002 | Text Quality Heuristics | ✅ Complete |
+| R003 | Pipeline Selector | ✅ Complete |
+| R004 | OCR Provider Interface | ✅ Complete |
+| R005 | PaddleOCR Integration | ✅ Complete |
+| R006 | Hybrid Merge | ✅ Complete |
+| R007 | Layout Analyzer | ✅ Complete |
+| R008 | Bank Profile | ✅ Complete |
+| R009 | Doctor CLI | ✅ Complete |
+| R010 | Regression Suite | ✅ Complete |
+
+Delivered:
+- Document diagnostics with text quality scoring (5 heuristics)
+- Pipeline selector (native/OCR/hybrid recommendation)
+- OCR provider interface + registry + PaddleOCR adapter
+- Hybrid merge (native + OCR into unified Document)
+- Layout analyzer (headers, footers, paragraphs, tables, reading order)
+- Bank profiler for SBI/HDFC/ICICI/Axis/generic
+- `privacy-firewall doctor` CLI command
+- Regression benchmarks with synthetic PDFs + recall tests
 
 ## Workflow
 
