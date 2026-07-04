@@ -1,4 +1,4 @@
-Status: TASK-011_COMPLETE
+Status: TASK-012_COMPLETE
 
 Completed:
 - Specification bootstrap
@@ -9,16 +9,15 @@ Completed:
 - Regex Framework (TASK-005)
 - PAN Detector (TASK-006)
 - Aadhaar Detector (TASK-007)
-- Email Detector (TASK-008)
-- Phone Detector (TASK-008)
-- UPI Detector (TASK-008)
+- Contact Detectors — Email, Phone, UPI (TASK-008)
 - Fusion Engine (TASK-009)
 - Redaction Planner (TASK-010)
+- PDF Renderer — black bar + highlight (TASK-011)
+- CLI Commands — scan, detect, redact (TASK-012)
 - Docstrings added to all source files
-- PDF Renderer (TASK-011)
 
 Current Task:
-TASK-012 — CLI Commands
+None — all 12 spec tasks complete
 
 Next:
 TASK-013 — TBD
