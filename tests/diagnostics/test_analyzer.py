@@ -7,6 +7,7 @@ import pytest
 from privacy_firewall.diagnostics import (
     DiagnosticReport,
     DocumentAnalyzer,
+    PipelineSelector,
     PipelineType,
     TextQualityAnalyzer,
 )
@@ -122,28 +123,38 @@ class TestDocumentAnalyzer:
         assert report.overall_score < 0.5
 
     def test_estimate_scanned_high_images(self) -> None:
-        assert DocumentAnalyzer._estimate_scanned(1, 5, 0.0) is True
+        scanned = PipelineSelector.estimate_scanned
+        assert scanned(page_count=1, image_count=5, text_quality_score=0.0) is True
 
     def test_estimate_scanned_low_quality(self) -> None:
-        assert DocumentAnalyzer._estimate_scanned(1, 1, 0.1) is True
+        scanned = PipelineSelector.estimate_scanned
+        assert scanned(page_count=1, image_count=1, text_quality_score=0.1) is True
 
     def test_estimate_not_scanned(self) -> None:
-        assert DocumentAnalyzer._estimate_scanned(1, 0, 0.9) is False
+        scanned = PipelineSelector.estimate_scanned
+        assert scanned(page_count=1, image_count=0, text_quality_score=0.9) is False
 
     def test_recommend_ocr_no_text(self) -> None:
-        assert DocumentAnalyzer._recommend_pipeline(False, 0.0, False) == PipelineType.OCR
+        sel = PipelineSelector.select
+        assert sel(has_native_text=False, text_quality_score=0.0) == PipelineType.OCR
 
     def test_recommend_ocr_scanned(self) -> None:
-        assert DocumentAnalyzer._recommend_pipeline(True, 0.9, True) == PipelineType.OCR
+        result = PipelineSelector.select(
+            has_native_text=True, text_quality_score=0.9, estimated_scanned=True,
+        )
+        assert result == PipelineType.OCR
 
     def test_recommend_ocr_low_quality(self) -> None:
-        assert DocumentAnalyzer._recommend_pipeline(True, 0.1, False) == PipelineType.OCR
+        sel = PipelineSelector.select
+        assert sel(has_native_text=True, text_quality_score=0.1) == PipelineType.OCR
 
     def test_recommend_hybrid(self) -> None:
-        assert DocumentAnalyzer._recommend_pipeline(True, 0.5, False) == PipelineType.HYBRID
+        sel = PipelineSelector.select
+        assert sel(has_native_text=True, text_quality_score=0.5) == PipelineType.HYBRID
 
     def test_recommend_native(self) -> None:
-        assert DocumentAnalyzer._recommend_pipeline(True, 0.9, False) == PipelineType.NATIVE
+        sel = PipelineSelector.select
+        assert sel(has_native_text=True, text_quality_score=0.9) == PipelineType.NATIVE
 
     def test_estimated_scanned_with_real_scanned(self, scanned_pdf: bytes) -> None:
         report = DocumentAnalyzer.from_bytes(scanned_pdf)
