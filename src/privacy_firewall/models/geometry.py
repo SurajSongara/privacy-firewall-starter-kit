@@ -1,7 +1,9 @@
-from pydantic import BaseModel, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 
-class BoundingBox(BaseModel, frozen=True):
+class BoundingBox(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     x0: float
     y0: float
     x1: float
@@ -24,7 +26,9 @@ class BoundingBox(BaseModel, frozen=True):
         return v
 
 
-class Span(BaseModel, frozen=True):
+class Span(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     start: int
     end: int
 
