@@ -20,7 +20,7 @@ class EmailDetector(BaseDetector):
         """Human-readable detector name."""
         return "email"
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         """Scan a document for email addresses.
 
         Iterates over all text blocks, matches against EMAIL_PATTERN, and
@@ -28,6 +28,8 @@ class EmailDetector(BaseDetector):
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, use per-span bounding boxes for
+                precise value-only redaction.
 
         Returns:
             A list of Detection objects for each valid email address found.
@@ -44,13 +46,19 @@ class EmailDetector(BaseDetector):
                     if not self._validate_format(email):
                         continue
 
+                    match_bbox = (
+                        block.bbox_for_span(match.start(), match.end())
+                        if values_only
+                        else block.bbox
+                    )
+
                     detections.append(
                         Detection(
                             detector_name=self.name,
                             detection_type="EMAIL",
                             text=email,
                             span=Span(start=match.start(), end=match.end()),
-                            bbox=block.bbox,
+                            bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.9,
                         )

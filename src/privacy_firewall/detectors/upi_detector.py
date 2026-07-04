@@ -53,7 +53,7 @@ class UpiDetector(BaseDetector):
         """Human-readable detector name."""
         return "upi"
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         """Scan a document for UPI IDs.
 
         Iterates over all text blocks, matches against UPI_PATTERN, validates
@@ -61,6 +61,8 @@ class UpiDetector(BaseDetector):
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, use per-span bounding boxes for
+                precise value-only redaction.
 
         Returns:
             A list of Detection objects for each valid UPI ID found.
@@ -79,13 +81,19 @@ class UpiDetector(BaseDetector):
                     if self._is_duplicate(detections, upi_id):
                         continue
 
+                    match_bbox = (
+                        block.bbox_for_span(match.start(), match.end())
+                        if values_only
+                        else block.bbox
+                    )
+
                     detections.append(
                         Detection(
                             detector_name=self.name,
                             detection_type="UPI",
                             text=upi_id,
                             span=Span(start=match.start(), end=match.end()),
-                            bbox=block.bbox,
+                            bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=self._resolve_confidence(upi_id),
                         )

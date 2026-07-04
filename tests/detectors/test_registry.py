@@ -9,7 +9,7 @@ class _PanDetector(BaseDetector):
     def name(self) -> str:
         return "pan"
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         return []
 
 
@@ -18,7 +18,7 @@ class _AadhaarDetector(BaseDetector):
     def name(self) -> str:
         return "aadhaar"
 
-    def scan(self, document: Document) -> list[Detection]:
+    def scan(self, document: Document, *, values_only: bool = False) -> list[Detection]:
         return []
 
 

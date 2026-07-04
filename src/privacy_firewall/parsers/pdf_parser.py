@@ -8,9 +8,12 @@ from typing import Any
 
 import fitz
 
-from privacy_firewall.models.blocks import Block, ImageBlock, TextBlock
+from privacy_firewall.models.blocks import Block, ImageBlock, TextBlock, TextSpan
 from privacy_firewall.models.document import Document, Page
 from privacy_firewall.models.geometry import BoundingBox
+
+WordTuple = tuple[float, float, float, float, str, int, int, int]
+"""Type of each word tuple returned by PyMuPDF's ``get_text("words")``."""
 
 
 class PDFParser:
@@ -35,7 +38,8 @@ class PDFParser:
         for page_num in range(len(doc)):
             page = doc[page_num]
             raw: dict[str, Any] = page.get_text("dict")
-            blocks = self._extract_blocks(raw, page_num + 1)
+            words_data: list[WordTuple] = page.get_text("words")
+            blocks = self._extract_blocks(raw, words_data, page_num + 1)
             pages.append(
                 Page(
                     page_number=page_num + 1,
@@ -64,7 +68,8 @@ class PDFParser:
         for page_num in range(len(doc)):
             page = doc[page_num]
             raw: dict[str, Any] = page.get_text("dict")
-            blocks = PDFParser._extract_blocks(raw, page_num + 1)
+            words_data: list[WordTuple] = page.get_text("words")
+            blocks = PDFParser._extract_blocks(raw, words_data, page_num + 1)
             pages.append(
                 Page(
                     page_number=page_num + 1,
@@ -78,17 +83,32 @@ class PDFParser:
         return Document(pages=pages)
 
     @staticmethod
-    def _extract_blocks(raw: dict[str, Any], page_number: int) -> list[Block]:
+    def _extract_blocks(
+        raw: dict[str, Any],
+        words_data: list[WordTuple],
+        page_number: int,
+    ) -> list[Block]:
         """Extract text and image blocks from a page's raw dictionary.
+
+        Uses ``get_text("words")`` for per-word bounding boxes so that
+        each word becomes a ``TextSpan`` with its precise geometry.
+        Image blocks are extracted from ``get_text("dict")`` as before.
 
         Args:
             raw: Raw page data as returned by PyMuPDF's ``get_text("dict")``.
+            words_data: Word-level data from ``get_text("words")``.
             page_number: The 1-based page number.
 
         Returns:
             A list of Block objects (TextBlock or ImageBlock).
         """
         blocks: list[Block] = []
+
+        # Group words by block_no
+        block_words: dict[int, list[WordTuple]] = {}
+        for w in words_data:
+            block_no: int = w[5]
+            block_words.setdefault(block_no, []).append(w)
 
         for item in raw.get("blocks", []):
             item_typed: dict[str, Any] = item
@@ -101,11 +121,25 @@ class PDFParser:
             block_id = str(uuid.uuid4())
 
             if item_typed["type"] == 0:
+                dict_block_no: int = item_typed.get("number", 0)
+                words = block_words.get(dict_block_no, [])
                 text_parts: list[str] = []
-                for line in item_typed.get("lines", []):
-                    for span in line.get("spans", []):
-                        text_parts.append(span["text"])
-                text = "".join(text_parts)
+                spans: list[TextSpan] = []
+                for w in words:
+                    word_text: str = w[4]
+                    spans.append(
+                        TextSpan(
+                            text=word_text,
+                            bbox=BoundingBox(
+                                x0=w[0],
+                                y0=w[1],
+                                x1=w[2],
+                                y1=w[3],
+                            ),
+                        )
+                    )
+                    text_parts.append(word_text)
+                text = " ".join(text_parts)
                 blocks.append(
                     TextBlock(
                         block_id=block_id,
@@ -113,6 +147,7 @@ class PDFParser:
                         page_number=page_number,
                         confidence=1.0,
                         text=text,
+                        spans=spans,
                     )
                 )
 

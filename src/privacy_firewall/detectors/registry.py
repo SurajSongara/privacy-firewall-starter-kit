@@ -51,18 +51,20 @@ class DetectorRegistry:
         """List of all registered detector names."""
         return list(self._detectors)
 
-    def run_all(self, document: Document) -> DetectionResult:
+    def run_all(self, document: Document, *, values_only: bool = False) -> DetectionResult:
         """Run every registered detector against the document.
 
         Args:
             document: The document to scan.
+            values_only: If ``True``, each detector uses per-span bounding
+                boxes so only the matched value is redacted.
 
         Returns:
             An aggregated DetectionResult containing all findings.
         """
         result = DetectionResult()
         for detector in self._detectors.values():
-            dr = timed_scan(detector, document)
+            dr = timed_scan(detector, document, values_only=values_only)
             result.merge(dr)
         return result
 

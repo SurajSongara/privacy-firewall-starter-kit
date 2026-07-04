@@ -82,18 +82,25 @@ class DetectionResult:
         )
 
 
-def timed_scan(detector: BaseDetector, document: Document) -> DetectionResult:
+def timed_scan(
+    detector: BaseDetector,
+    document: Document,
+    *,
+    values_only: bool = False,
+) -> DetectionResult:
     """Run a detector's scan and time its execution.
 
     Args:
         detector: The detector to run.
         document: The document to scan.
+        values_only: Forwarded to ``detector.scan()`` — if ``True``,
+            per-span bounding boxes are computed for each match.
 
     Returns:
         A DetectionResult that includes both the findings and timing metadata.
     """
     start = time.perf_counter()
-    detections = detector.scan(document)
+    detections = detector.scan(document, values_only=values_only)
     elapsed = (time.perf_counter() - start) * 1000
     return DetectionResult.from_detections(
         detector_name=detector.name,

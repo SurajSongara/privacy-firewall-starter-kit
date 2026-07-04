@@ -62,13 +62,20 @@ def detect_cmd(
         bool,
         typer.Option("--no-fuse", help="Skip fusion (show raw detections)."),
     ] = False,
+    values_only: Annotated[
+        bool,
+        typer.Option(
+            "--values-only",
+            help="Use per-span bounding boxes (shows precise match regions).",
+        ),
+    ] = False,
 ) -> None:
     """Run PII detectors on a PDF and list all detections found."""
     parser = PDFParser(input_pdf)
     document = parser.parse()
 
     registry = _build_registry(detector)
-    result = registry.run_all(document)
+    result = registry.run_all(document, values_only=values_only)
 
     detections = result.detections
     if not no_fuse:
