@@ -1,0 +1,48 @@
+{
+  "document": "synthetic/07-form16-batch-2.pdf",
+  "description": "Synthetic 07 Form16 Batch 2",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "YYYJH8254N",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "752717273999",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "priya_patel538@company.co.in",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "7834839075",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "ACCOUNT",
+      "text": "68146471081",
+      "page_number": 2,
+      "label": "Bank Account:"
+    },
+    {
+      "detection_type": "IFSC",
+      "text": "SBIN0O1URG3",
+      "page_number": 2,
+      "label": "IFSC Code:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "priya.patel68@sbi",
+      "page_number": 2,
+      "label": "UPI ID:"
+    }
+  ]
+}

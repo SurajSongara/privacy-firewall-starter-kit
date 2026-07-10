@@ -97,6 +97,7 @@ class UpiDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=self._resolve_confidence(upi_id),
+                            reasons=self._resolve_reasons(upi_id),
                         )
                     )
 
@@ -140,5 +141,20 @@ class UpiDetector(BaseDetector):
         if handle in KNOWN_UPI_HANDLES:
             return 0.95
         return 0.7
+
+    @staticmethod
+    def _resolve_reasons(upi_id: str) -> tuple[str, ...]:
+        """Return human-readable evidence for a UPI match.
+
+        Args:
+            upi_id: The UPI ID string.
+
+        Returns:
+            Evidence strings describing why this match was accepted.
+        """
+        handle = upi_id.split("@", 1)[1] if "@" in upi_id else ""
+        if handle in KNOWN_UPI_HANDLES:
+            return ("matches UPI ID format", f"known payment-provider handle '{handle}'")
+        return ("matches UPI ID format", f"unrecognised handle '{handle}'")
 
 

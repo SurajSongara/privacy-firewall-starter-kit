@@ -110,6 +110,8 @@ class PDFParser:
             block_no: int = w[5]
             block_words.setdefault(block_no, []).append(w)
 
+        # Map dict block bboxes to words using spatial proximity
+        # PyMuPDF's get_text("words") uses different block numbering than get_text("dict")
         for item in raw.get("blocks", []):
             item_typed: dict[str, Any] = item
             bbox = BoundingBox(
@@ -121,11 +123,23 @@ class PDFParser:
             block_id = str(uuid.uuid4())
 
             if item_typed["type"] == 0:
-                dict_block_no: int = item_typed.get("number", 0)
-                words = block_words.get(dict_block_no, [])
+                # Find words that fall within this block's bbox
+                block_x0, block_y0, block_x1, block_y1 = item_typed["bbox"]
+                matching_words = []
+                for w in words_data:
+                    # Word bbox: (x0, y0, x1, y1, text, block_no, line_no, word_no)
+                    wx0, wy0, wx1, wy1 = w[0], w[1], w[2], w[3]
+                    # Check if word overlaps with block bbox
+                    if (wx0 < block_x1 and wx1 > block_x0 and
+                        wy0 < block_y1 and wy1 > block_y0):
+                        matching_words.append(w)
+
+                # Sort words by position (top-to-bottom, left-to-right)
+                matching_words.sort(key=lambda w: (w[1], w[0]))
+
                 text_parts: list[str] = []
                 spans: list[TextSpan] = []
-                for w in words:
+                for w in matching_words:
                     word_text: str = w[4]
                     spans.append(
                         TextSpan(

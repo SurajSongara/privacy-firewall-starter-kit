@@ -7,14 +7,19 @@ import typer
 
 from privacy_firewall.detectors import (
     AadhaarDetector,
+    AccountDetector,
     DetectorRegistry,
     EmailDetector,
+    IFSCDetector,
     PANDetector,
     PhoneDetector,
     UpiDetector,
 )
+from privacy_firewall.engine.context import ContextScorer
+from privacy_firewall.engine.decision import DecisionEngine, file_sha256
 from privacy_firewall.engine.fusion import FusionEngine
-from privacy_firewall.parsers.pdf_parser import PDFParser
+from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
+from privacy_firewall.policy import DEFAULT_POLICY_NAME, get_policy
 
 
 def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
@@ -32,6 +37,8 @@ def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
         "email": EmailDetector,
         "phone": PhoneDetector,
         "upi": UpiDetector,
+        "ifsc": IFSCDetector,
+        "account": AccountDetector,
     }
 
     registry = DetectorRegistry()
@@ -43,6 +50,14 @@ def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
             raise typer.BadParameter(msg)
         registry.register(cls())
     return registry
+
+
+def _engine_help() -> str:
+    from privacy_firewall.ocr import list_engines
+
+    engines = list_engines()
+    default = engines[0] if engines else "(none)"
+    return f"OCR engine to use. Available: {', '.join(engines)}. [default: {default}]"
 
 
 def detect_cmd(
@@ -69,23 +84,70 @@ def detect_cmd(
             help="Use per-span bounding boxes (shows precise match regions).",
         ),
     ] = False,
+    ocr: Annotated[
+        bool,
+        typer.Option("--ocr", help="Run OCR and merge with native text."),
+    ] = False,
+    auto: Annotated[
+        bool,
+        typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
+    ] = False,
+    ocr_engine: Annotated[
+        str | None,
+        typer.Option("--ocr-engine", help=_engine_help()),
+    ] = None,
+    plan_out: Annotated[
+        Path | None,
+        typer.Option(
+            "--plan",
+            help="Write a review-plan JSON (for `redact --plan` or the review UI).",
+        ),
+    ] = None,
+    policy: Annotated[
+        str,
+        typer.Option(
+            "--policy",
+            help="Policy for plan suggestions: builtin name or a YAML/JSON file path.",
+        ),
+    ] = DEFAULT_POLICY_NAME,
 ) -> None:
     """Run PII detectors on a PDF and list all detections found."""
-    parser = PDFParser(input_pdf)
-    document = parser.parse()
+    document, source = get_merged_document(
+        input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine,
+    )
 
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)
 
-    detections = result.detections
+    detections = ContextScorer().apply(document, result.detections)
     if not no_fuse:
         engine = FusionEngine()
         fused = engine.fuse(detections)
         detections = fused.detections
 
+    typer.echo(f"Pipeline: {get_pipeline_summary(source)}")
     typer.echo(f"Detections ({len(detections)}):")
     for i, d in enumerate(detections, start=1):
         typer.echo(
             f"  {i:>3}. Page {d.page_number} | {d.detection_type:8s} | {d.text!r:30s} "
             f"| confidence={d.confidence:.2f} | detector={d.detector_name}"
+        )
+
+    if plan_out is not None:
+        try:
+            policy_obj = get_policy(policy)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        plan = DecisionEngine().decide(
+            detections,
+            policy_obj,
+            source_path=str(input_pdf),
+            source_sha256=file_sha256(input_pdf),
+        )
+        plan_out.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        counts = plan.counts()
+        typer.echo(f"Review plan written to: {plan_out}")
+        typer.echo(
+            f"  Suggested (policy={policy_obj.name}): "
+            f"redact={counts['redact']} ask={counts['ask']} keep={counts['keep']}"
         )

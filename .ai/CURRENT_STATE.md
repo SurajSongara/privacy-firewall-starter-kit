@@ -1,4 +1,4 @@
-Status: TASK-015_COMPLETE — Phase 1 Complete
+Status: P009_COMPLETE — Phase 3 complete (P010 feedback memory deferred)
 
 ## Phase 1 — Core Engine (Complete)
 
@@ -34,6 +34,16 @@ PDF/Image -> Parser -> Document -> Detectors -> Fusion -> Planner -> Renderer
 - 231 tests passing, ruff clean, mypy clean
 - 6 detectors, 2 redaction modes (full-block + values-only)
 - CLI contains zero business logic
+
+## Phase 3 — Precision & Review Pack (Planned)
+
+Detection ≠ decision: insert a policy-driven DecisionEngine between fusion and planning, fix known false positives (Aadhaar Verhoeff, phone/email context), and add an offline local-web review UI where the engine pre-selects and the user confirms. Pipeline becomes:
+
+```
+Detectors -> Fusion -> DecisionEngine (policy) -> ReviewPlan (user review) -> Planner -> Renderer
+```
+
+Tasks P001–P010 in `tasks/` (see `tasks/README.md`). Build order: precision fixes (P001–P004) → policy + plan-file CLI (P005–P007) → review UI (P008–P009) → feedback memory (P010).
 
 ## Phase 2 — Upcoming
 

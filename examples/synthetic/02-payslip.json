@@ -1,0 +1,48 @@
+{
+  "document": "synthetic/02-payslip.pdf",
+  "description": "Synthetic 02 Payslip",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "FFFAP3081D",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "471205398539",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "rohitverma489@company.co.in",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "9210465917",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "ACCOUNT",
+      "text": "26697927100567",
+      "page_number": 1,
+      "label": "Account No:"
+    },
+    {
+      "detection_type": "IFSC",
+      "text": "HDFC04OOH2Y",
+      "page_number": 1,
+      "label": "IFSC:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "rohit.verma81@okaxis",
+      "page_number": 1,
+      "label": "UPI:"
+    }
+  ]
+}

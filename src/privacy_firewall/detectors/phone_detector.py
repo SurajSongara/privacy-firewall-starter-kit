@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from privacy_firewall.detectors.base import BaseDetector
-from privacy_firewall.detectors.utils import is_containment_duplicate
+from privacy_firewall.detectors.utils import is_containment_duplicate, is_in_slash_token
 from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
@@ -54,6 +54,8 @@ class PhoneDetector(BaseDetector):
                         raw = match.group()
                         if not self._validate_phone(raw):
                             continue
+                        if is_in_slash_token(block.text, match.start(), match.end()):
+                            continue
                         normalized = re.sub(r"[^\d]", "", raw)
                         if is_containment_duplicate(detections, normalized):
                             continue
@@ -73,6 +75,7 @@ class PhoneDetector(BaseDetector):
                                 bbox=match_bbox,
                                 page_number=page.page_number,
                                 confidence=self._resolve_confidence(raw),
+                                reasons=self._resolve_reasons(raw),
                             )
                         )
 
@@ -111,5 +114,24 @@ class PhoneDetector(BaseDetector):
         if raw.startswith("+") or raw.startswith("0"):
             return 0.9
         return 0.7
+
+    @staticmethod
+    def _resolve_reasons(raw: str) -> tuple[str, ...]:
+        """Return human-readable evidence for a phone match.
+
+        Args:
+            raw: The raw phone number string.
+
+        Returns:
+            Evidence strings describing why this match was accepted.
+        """
+        digits_only = re.sub(r"[^\d]", "", raw)
+        if len(digits_only) == 10:
+            return ("10-digit mobile number starting with 6-9",)
+        if raw.startswith("+"):
+            return ("matches phone format", "has international dialling prefix")
+        if raw.startswith("0"):
+            return ("matches phone format", "has trunk prefix '0'")
+        return ("matches phone format",)
 
 

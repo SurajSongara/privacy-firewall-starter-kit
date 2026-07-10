@@ -1,0 +1,374 @@
+{
+  "01-form16": {
+    "document": "synthetic/01-form16.pdf",
+    "description": "Synthetic 01 Form16",
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "LLLGY3630E",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "295101016126",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "poojagupta569@hotmail.com",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "7176005879",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "ACCOUNT",
+        "text": "59006891774",
+        "page_number": 2,
+        "label": "Bank Account:"
+      },
+      {
+        "detection_type": "IFSC",
+        "text": "SBIN0T92TKR",
+        "page_number": 2,
+        "label": "IFSC Code:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "pooja.gupta61@okaxis",
+        "page_number": 2,
+        "label": "UPI ID:"
+      }
+    ]
+  },
+  "02-payslip": {
+    "document": "synthetic/02-payslip.pdf",
+    "description": "Synthetic 02 Payslip",
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "FFFAP3081D",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "471205398539",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "rohitverma489@company.co.in",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "9210465917",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "ACCOUNT",
+        "text": "26697927100567",
+        "page_number": 1,
+        "label": "Account No:"
+      },
+      {
+        "detection_type": "IFSC",
+        "text": "HDFC04OOH2Y",
+        "page_number": 1,
+        "label": "IFSC:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "rohit.verma81@okaxis",
+        "page_number": 1,
+        "label": "UPI:"
+      }
+    ]
+  },
+  "03-tricky-edge-cases": {
+    "document": "synthetic/03-tricky-edge-cases.pdf",
+    "description": "Synthetic 03 Tricky Edge Cases",
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "ABCPA5678J",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "+91-9876543210",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "rajesh.sharma@gmail.com",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "226251716424",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "rajesh@okhdfcbank",
+        "page_number": 1,
+        "label": "UPI:"
+      },
+      {
+        "detection_type": "PAN",
+        "text": "XYZAB1234C",
+        "page_number": 2,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "support@bank.co.in",
+        "page_number": 2,
+        "label": "Contact:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "priya@ybl",
+        "page_number": 2,
+        "label": "UPI:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "9876543210",
+        "page_number": 2,
+        "label": "Mobile:"
+      },
+      {
+        "detection_type": "PAN",
+        "text": "MNPPR5678S",
+        "page_number": 3,
+        "label": "Small text:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "555566667771",
+        "page_number": 3,
+        "label": "Tight spacing"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "user@test.com",
+        "page_number": 3,
+        "label": "Tight spacing"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "234512341239",
+        "page_number": 3,
+        "label": "Mixed case"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "98765-43210",
+        "page_number": 3,
+        "label": "With symbols"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "user@paytm",
+        "page_number": 3,
+        "label": "With symbols"
+      }
+    ]
+  },
+  "04-aadhaar-checksum": {
+    "document": "synthetic/04-aadhaar-checksum.pdf",
+    "description": "Synthetic 04 Aadhaar Checksum",
+    "expectations": [
+      {
+        "detection_type": "AADHAAR",
+        "text": "862583142918",
+        "page_number": 1,
+        "label": "Valid Aadhaar"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "972321657612",
+        "page_number": 1,
+        "label": "Valid Aadhaar"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "943777358751",
+        "page_number": 1,
+        "label": "Valid Aadhaar"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "886548827935",
+        "page_number": 1,
+        "label": "Valid Aadhaar"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "389856146539",
+        "page_number": 1,
+        "label": "Valid Aadhaar"
+      }
+    ]
+  },
+  "05-payslip-batch-2": {
+    "document": "synthetic/05-payslip-batch-2.pdf",
+    "description": "Synthetic 05 Payslip Batch 2",
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "UUUHO0399J",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "317249901773",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "sanjay.mishra584@gmail.com",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "7692542750",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "ACCOUNT",
+        "text": "19776541782",
+        "page_number": 1,
+        "label": "Account No:"
+      },
+      {
+        "detection_type": "IFSC",
+        "text": "SBIN0Q0DDON",
+        "page_number": 1,
+        "label": "IFSC:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "sanjay.mishra8@okhdfcbank",
+        "page_number": 1,
+        "label": "UPI:"
+      }
+    ]
+  },
+  "06-payslip-batch-3": {
+    "document": "synthetic/06-payslip-batch-3.pdf",
+    "description": "Synthetic 06 Payslip Batch 3",
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "OOOGH1783L",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "248328402578",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "vikramjoshi267@gmail.com",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "8224011447",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "ACCOUNT",
+        "text": "989584899950929",
+        "page_number": 1,
+        "label": "Account No:"
+      },
+      {
+        "detection_type": "IFSC",
+        "text": "UTIB0UMYG5C",
+        "page_number": 1,
+        "label": "IFSC:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "vikram.joshi64@paytm",
+        "page_number": 1,
+        "label": "UPI:"
+      }
+    ]
+  },
+  "07-form16-batch-2": {
+    "document": "synthetic/07-form16-batch-2.pdf",
+    "description": "Synthetic 07 Form16 Batch 2",
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "YYYJH8254N",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "752717273999",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "priya_patel538@company.co.in",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "7834839075",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "ACCOUNT",
+        "text": "68146471081",
+        "page_number": 2,
+        "label": "Bank Account:"
+      },
+      {
+        "detection_type": "IFSC",
+        "text": "SBIN0O1URG3",
+        "page_number": 2,
+        "label": "IFSC Code:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "priya.patel68@sbi",
+        "page_number": 2,
+        "label": "UPI ID:"
+      }
+    ]
+  }
+}

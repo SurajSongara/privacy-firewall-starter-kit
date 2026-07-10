@@ -6,10 +6,11 @@ Detect and redact sensitive information from PDF documents — entirely offline.
 
 ## Features
 
-- **6 detectors**: PAN, Aadhaar, Email, Phone, UPI, plus a generic regex framework
+- **7 detectors**: PAN, Aadhaar, Email, Phone, UPI, IFSC, Account Number
 - **Destructive redaction**: Text is physically stripped from the PDF content stream (not just visually overlaid)
 - **Values-only mode**: Redact only the PII value while preserving labels (`--values-only`)
 - **Priority-based fusion**: Overlapping detections resolved by detector priority tiers
+- **OCR support**: RapidOCR integration for scanned documents
 - **CLI-first**: Zero business logic in the CLI — all work delegated to engine components
 
 ## Quick Start
@@ -38,7 +39,7 @@ src/privacy_firewall/
 ├── cli/                 # CLI commands (scan, detect, redact) — zero logic
 ├── models/              # Pydantic v2 frozen models
 ├── parsers/             # PyMuPDF PDF parser
-├── detectors/           # BaseDetector ABC, registry, 6 detectors
+├── detectors/           # BaseDetector ABC, registry, 7 detectors
 ├── engine/              # Fusion engine + redaction planner
 └── renderer/            # PDF renderer (destructive redaction)
 

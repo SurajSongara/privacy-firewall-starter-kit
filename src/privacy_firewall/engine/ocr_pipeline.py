@@ -1,0 +1,153 @@
+"""OCR pipeline — decides whether to invoke OCR and merges results."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from privacy_firewall.diagnostics import DocumentAnalyzer, PipelineType
+from privacy_firewall.engine.hybrid_merger import HybridMerger
+from privacy_firewall.models.document import Document
+from privacy_firewall.ocr.provider import OCRProvider
+
+
+def get_merged_document(
+    pdf_path: Path,
+    *,
+    force_ocr: bool = False,
+    auto: bool = False,
+    native_doc: Document | None = None,
+    ocr_provider: str | None = None,
+) -> tuple[Document, str]:
+    """Return the best available document for detection.
+
+    Args:
+        pdf_path: Path to the PDF file.
+        force_ocr: When ``True``, always run OCR and merge with native.
+        auto: When ``True``, run diagnostics and decide automatically.
+        native_doc: Pre-parsed native document (avoids re-parsing).
+        ocr_provider: OCR adapter name.  ``None`` uses the registry default.
+
+    Returns:
+        A ``(document, source)`` tuple where *source* is one of
+        ``"native"``, ``"ocr"``, or ``"hybrid"``.
+    """
+    from privacy_firewall.parsers.pdf_parser import PDFParser
+
+    if native_doc is None:
+        native_doc = PDFParser(pdf_path).parse()
+
+    if not force_ocr and not auto:
+        return native_doc, "native"
+
+    if auto:
+        report = DocumentAnalyzer(pdf_path).analyze()
+        pipeline = report.recommended_pipeline
+        if pipeline == PipelineType.NATIVE:
+            return native_doc, "native"
+
+    ocr_doc = _run_ocr(pdf_path, provider=ocr_provider)
+
+    if not native_doc.pages or all(
+        not any(hasattr(b, "text") and b.text for b in p.blocks)
+        for p in native_doc.pages
+    ):
+        return ocr_doc, "ocr"
+
+    merge_result = HybridMerger.merge(native_doc, ocr_doc)
+    return merge_result.document, "hybrid"
+
+
+def _run_ocr(pdf_path: Path, provider: str | None = None) -> Document:
+    """Run an OCR adapter on a PDF file.
+
+    When no provider is named, engines are tried in registry order
+    (default first). An adapter can import fine but still fail at
+    runtime — e.g. Tesseract installed without its tessdata — so
+    failures fall through to the next engine instead of aborting.
+
+    Args:
+        pdf_path: Path to the PDF.
+        provider: OCR adapter name, or ``None`` to try all registered
+            engines until one succeeds.
+
+    Returns:
+        A ``Document`` with OCR-extracted blocks.
+
+    Raises:
+        RuntimeError: If every registered engine failed.
+        ValueError: If a named provider is unknown, or none are registered.
+    """
+    if provider is not None:
+        return _get_adapter(provider).process(pdf_path)
+
+    from privacy_firewall.ocr import get_registry
+
+    registry = get_registry()
+    names = registry.names
+    if not names:
+        return _get_adapter(None).process(pdf_path)  # raises the install hint
+
+    if registry.default_name in names:
+        names.remove(registry.default_name)
+        names.insert(0, registry.default_name)
+
+    errors: list[str] = []
+    for name in names:
+        try:
+            return _get_adapter(name).process(pdf_path)
+        except Exception as exc:  # noqa: BLE001 - each engine fails its own way
+            errors.append(f"{name}: {exc}")
+
+    msg = "All OCR engines failed:\n" + "\n".join(f"  - {e}" for e in errors)
+    raise RuntimeError(msg)
+
+
+def _get_adapter(name: str | None = None) -> OCRProvider:
+    """Look up an OCR adapter from the global registry.
+
+    Args:
+        name: Adapter name, or ``None`` for the registry default.
+
+    Returns:
+        An ``OCRProvider`` instance.
+
+    Raises:
+        ValueError: If the name is unknown or no default is set.
+    """
+    from privacy_firewall.ocr import get_registry
+
+    registry = get_registry()
+
+    if name is None:
+        cls = registry.get_default()
+        if cls is None:
+            msg = (
+                "No OCR engine available. Install one of:\n"
+                "  pip install tesserocr   (Tesseract)\n"
+                "  pip install paddleocr   (PaddleOCR)"
+            )
+            raise ValueError(msg)
+        return cls()
+
+    cls = registry.get(name)
+    if cls is None:
+        available = ", ".join(registry.names) or "(none)"
+        msg = f"Unknown OCR engine: {name!r}. Available: {available}"
+        raise ValueError(msg)
+    return cls()
+
+
+def get_pipeline_summary(source: str) -> str:
+    """Return a human-readable summary of the pipeline used.
+
+    Args:
+        source: The pipeline source string.
+
+    Returns:
+        A descriptive string.
+    """
+    summaries = {
+        "native": "Native text extraction",
+        "ocr": "Full OCR processing",
+        "hybrid": "Hybrid (native + OCR merge)",
+    }
+    return summaries.get(source, f"Unknown ({source})")

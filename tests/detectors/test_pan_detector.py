@@ -32,6 +32,14 @@ class TestPANDetector:
         assert result[0].detection_type == "PAN"
         assert result[0].confidence == 0.95
 
+    def test_detection_carries_evidence(self) -> None:
+        doc = Document(pages=[_page(f"My PAN is {VALID_PAN}")])
+        result = self.detector.scan(doc)
+        assert result[0].reasons != ()
+        assert result[0].detection_id
+        rescan = self.detector.scan(doc)
+        assert rescan[0].detection_id == result[0].detection_id
+
     def test_detect_individual_pan_status_p(self) -> None:
         doc = Document(pages=[_page("PAN: AAAAA1111P")])
         result = self.detector.scan(doc)

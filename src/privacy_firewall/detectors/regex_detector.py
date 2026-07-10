@@ -97,6 +97,7 @@ class RegexDetector(BaseDetector):
                                 bbox=match_bbox,
                                 page_number=page.page_number,
                                 confidence=conf,
+                                reasons=(f"matches {self._detection_type} pattern",),
                             )
                         )
 

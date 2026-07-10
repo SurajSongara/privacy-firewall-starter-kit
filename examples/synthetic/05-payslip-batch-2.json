@@ -1,0 +1,48 @@
+{
+  "document": "synthetic/05-payslip-batch-2.pdf",
+  "description": "Synthetic 05 Payslip Batch 2",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "UUUHO0399J",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "317249901773",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "sanjay.mishra584@gmail.com",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "7692542750",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "ACCOUNT",
+      "text": "19776541782",
+      "page_number": 1,
+      "label": "Account No:"
+    },
+    {
+      "detection_type": "IFSC",
+      "text": "SBIN0Q0DDON",
+      "page_number": 1,
+      "label": "IFSC:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "sanjay.mishra8@okhdfcbank",
+      "page_number": 1,
+      "label": "UPI:"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "document": "synthetic/03-tricky-edge-cases.pdf",
+  "description": "Synthetic 03 Tricky Edge Cases",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "ABCPA5678J",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "+91-9876543210",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "rajesh.sharma@gmail.com",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "226251716424",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "rajesh@okhdfcbank",
+      "page_number": 1,
+      "label": "UPI:"
+    },
+    {
+      "detection_type": "PAN",
+      "text": "XYZAB1234C",
+      "page_number": 2,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "support@bank.co.in",
+      "page_number": 2,
+      "label": "Contact:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "priya@ybl",
+      "page_number": 2,
+      "label": "UPI:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "9876543210",
+      "page_number": 2,
+      "label": "Mobile:"
+    },
+    {
+      "detection_type": "PAN",
+      "text": "MNPPR5678S",
+      "page_number": 3,
+      "label": "Small text:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "555566667771",
+      "page_number": 3,
+      "label": "Tight spacing"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "user@test.com",
+      "page_number": 3,
+      "label": "Tight spacing"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "234512341239",
+      "page_number": 3,
+      "label": "Mixed case"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "98765-43210",
+      "page_number": 3,
+      "label": "With symbols"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "user@paytm",
+      "page_number": 3,
+      "label": "With symbols"
+    }
+  ]
+}

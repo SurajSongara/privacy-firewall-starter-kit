@@ -1,0 +1,36 @@
+{
+  "document": "synthetic/04-aadhaar-checksum.pdf",
+  "description": "Synthetic 04 Aadhaar Checksum",
+  "expectations": [
+    {
+      "detection_type": "AADHAAR",
+      "text": "862583142918",
+      "page_number": 1,
+      "label": "Valid Aadhaar"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "972321657612",
+      "page_number": 1,
+      "label": "Valid Aadhaar"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "943777358751",
+      "page_number": 1,
+      "label": "Valid Aadhaar"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "886548827935",
+      "page_number": 1,
+      "label": "Valid Aadhaar"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "389856146539",
+      "page_number": 1,
+      "label": "Valid Aadhaar"
+    }
+  ]
+}
