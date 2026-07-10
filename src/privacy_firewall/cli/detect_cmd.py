@@ -16,8 +16,10 @@ from privacy_firewall.detectors import (
     UpiDetector,
 )
 from privacy_firewall.engine.context import ContextScorer
+from privacy_firewall.engine.decision import DecisionEngine, file_sha256
 from privacy_firewall.engine.fusion import FusionEngine
 from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
+from privacy_firewall.policy import DEFAULT_POLICY_NAME, get_policy
 
 
 def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
@@ -94,6 +96,20 @@ def detect_cmd(
         str | None,
         typer.Option("--ocr-engine", help=_engine_help()),
     ] = None,
+    plan_out: Annotated[
+        Path | None,
+        typer.Option(
+            "--plan",
+            help="Write a review-plan JSON (for `redact --plan` or the review UI).",
+        ),
+    ] = None,
+    policy: Annotated[
+        str,
+        typer.Option(
+            "--policy",
+            help="Policy for plan suggestions: builtin name or a YAML/JSON file path.",
+        ),
+    ] = DEFAULT_POLICY_NAME,
 ) -> None:
     """Run PII detectors on a PDF and list all detections found."""
     document, source = get_merged_document(
@@ -115,4 +131,23 @@ def detect_cmd(
         typer.echo(
             f"  {i:>3}. Page {d.page_number} | {d.detection_type:8s} | {d.text!r:30s} "
             f"| confidence={d.confidence:.2f} | detector={d.detector_name}"
+        )
+
+    if plan_out is not None:
+        try:
+            policy_obj = get_policy(policy)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        plan = DecisionEngine().decide(
+            detections,
+            policy_obj,
+            source_path=str(input_pdf),
+            source_sha256=file_sha256(input_pdf),
+        )
+        plan_out.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        counts = plan.counts()
+        typer.echo(f"Review plan written to: {plan_out}")
+        typer.echo(
+            f"  Suggested (policy={policy_obj.name}): "
+            f"redact={counts['redact']} ask={counts['ask']} keep={counts['keep']}"
         )

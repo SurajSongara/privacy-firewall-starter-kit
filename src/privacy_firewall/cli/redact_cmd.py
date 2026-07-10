@@ -6,10 +6,13 @@ from typing import Annotated
 import typer
 
 from privacy_firewall.cli.detect_cmd import _build_registry
+from privacy_firewall.cli.scan_cmd import _safe
 from privacy_firewall.engine.context import ContextScorer
+from privacy_firewall.engine.decision import ReviewDecision, ReviewPlan, file_sha256
 from privacy_firewall.engine.fusion import FusionEngine
 from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 from privacy_firewall.engine.redaction import RedactionPlanner, RedactionType
+from privacy_firewall.models.detection import Detection
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
 
 
@@ -65,6 +68,29 @@ def redact_cmd(
         str | None,
         typer.Option("--ocr-engine", help=_engine_help()),
     ] = None,
+    plan_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--plan",
+            help="Apply a review plan (from `detect --plan`) instead of re-detecting.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ] = None,
+    interactive: Annotated[
+        bool,
+        typer.Option(
+            "--interactive",
+            help="With --plan: review undecided detections in the terminal.",
+        ),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            help="With --plan: accept all suggestions (unresolved 'ask' items are redacted).",
+        ),
+    ] = False,
 ) -> None:
     """Scan a PDF for PII and produce a redacted copy."""
     type_map: dict[str, RedactionType] = {
@@ -78,23 +104,90 @@ def redact_cmd(
         msg = f"Unknown redaction type: {redaction_type!r}. Choose from: {choices}"
         raise typer.BadParameter(msg)
 
-    document, source = get_merged_document(
-        input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine,
-    )
+    if plan_path is not None:
+        detections = _resolve_from_plan(plan_path, input_pdf, interactive=interactive, yes=yes)
+        document, _ = get_merged_document(input_pdf)
+        pipeline_note = f"review plan ({plan_path.name})"
+    else:
+        document, source = get_merged_document(
+            input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine,
+        )
 
-    registry = _build_registry(detector)
-    result = registry.run_all(document, values_only=values_only)
+        registry = _build_registry(detector)
+        result = registry.run_all(document, values_only=values_only)
 
-    scored = ContextScorer().apply(document, result.detections)
-    engine = FusionEngine()
-    fused = engine.fuse(scored)
+        scored = ContextScorer().apply(document, result.detections)
+        engine = FusionEngine()
+        detections = engine.fuse(scored).detections
+        pipeline_note = get_pipeline_summary(source)
 
     planner = RedactionPlanner()
-    plan = planner.plan(document, fused.detections, default_type=rtype)
+    plan = planner.plan(document, detections, default_type=rtype)
 
     renderer = PDFRenderer()
     out_path = renderer.render(input_pdf, output_pdf, plan)
 
-    typer.echo(f"Pipeline: {get_pipeline_summary(source)}")
+    typer.echo(f"Pipeline: {pipeline_note}")
     typer.echo(f"Redacted PDF saved to: {out_path}")
     typer.echo(f"Redactions applied: {plan.total_redactions}")
+
+
+def _resolve_from_plan(
+    plan_path: Path, input_pdf: Path, *, interactive: bool, yes: bool
+) -> list[Detection]:
+    """Load a review plan, optionally review it, and resolve the redact list."""
+    review_plan = ReviewPlan.model_validate_json(plan_path.read_text(encoding="utf-8"))
+
+    actual_hash = file_sha256(input_pdf)
+    if review_plan.source_sha256 != actual_hash:
+        msg = (
+            f"Plan {plan_path} was created for a different file "
+            f"(plan hash {review_plan.source_sha256[:12]}…, "
+            f"input hash {actual_hash[:12]}…)"
+        )
+        raise typer.BadParameter(msg)
+
+    if interactive:
+        _review_interactively(review_plan)
+        plan_path.write_text(review_plan.model_dump_json(indent=2), encoding="utf-8")
+        typer.echo(f"Decisions saved to: {plan_path}")
+
+    try:
+        return review_plan.resolve(accept_suggestions=yes or interactive)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        typer.echo(
+            "Hint: re-run with --interactive to review the pending items, "
+            "or --yes to accept all suggestions.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+
+def _review_interactively(review_plan: ReviewPlan) -> None:
+    """Walk the undecided 'ask' entries and record the user's decisions."""
+    pending = review_plan.pending_entries()
+    if not pending:
+        typer.echo("No detections need review.")
+        return
+
+    typer.echo(f"{len(pending)} detection(s) need review:")
+    for i, entry in enumerate(pending, start=1):
+        d = entry.detection
+        typer.echo(
+            f"\n[{i}/{len(pending)}] Page {d.page_number} | {d.detection_type} | {_safe(d.text)}"
+        )
+        typer.echo(f"  confidence={d.confidence:.2f}")
+        for reason in d.reasons + entry.suggestion_reasons:
+            typer.echo(f"  - {_safe(reason, max_len=100)}")
+
+        choice = typer.prompt("  [r]edact / [k]eep / [R]edact all / [q]uit", default="r").strip()
+        if choice == "q":
+            break
+        if choice == "R":
+            for rest in review_plan.pending_entries():
+                rest.decision = ReviewDecision.REDACT
+            break
+        entry.decision = (
+            ReviewDecision.KEEP if choice.lower().startswith("k") else ReviewDecision.REDACT
+        )
