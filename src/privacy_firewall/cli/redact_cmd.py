@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from privacy_firewall.cli.detect_cmd import _build_registry
+from privacy_firewall.engine.context import ContextScorer
 from privacy_firewall.engine.fusion import FusionEngine
 from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 from privacy_firewall.engine.redaction import RedactionPlanner, RedactionType
@@ -84,8 +85,9 @@ def redact_cmd(
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)
 
+    scored = ContextScorer().apply(document, result.detections)
     engine = FusionEngine()
-    fused = engine.fuse(result.detections)
+    fused = engine.fuse(scored)
 
     planner = RedactionPlanner()
     plan = planner.plan(document, fused.detections, default_type=rtype)

@@ -15,6 +15,7 @@ from privacy_firewall.detectors import (
     PhoneDetector,
     UpiDetector,
 )
+from privacy_firewall.engine.context import ContextScorer
 from privacy_firewall.engine.fusion import FusionEngine
 from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 
@@ -102,7 +103,7 @@ def detect_cmd(
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)
 
-    detections = result.detections
+    detections = ContextScorer().apply(document, result.detections)
     if not no_fuse:
         engine = FusionEngine()
         fused = engine.fuse(detections)
