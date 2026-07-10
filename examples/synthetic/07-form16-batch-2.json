@@ -1,0 +1,48 @@
+{
+  "document": "synthetic/07-form16-batch-2.pdf",
+  "description": "Synthetic 07 Form16 Batch 2",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "VVVTT4474I",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "332861831869",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "rohit.verma216@gmail.com",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "7872419273",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "ACCOUNT",
+      "text": "08827778813",
+      "page_number": 2,
+      "label": "Bank Account:"
+    },
+    {
+      "detection_type": "IFSC",
+      "text": "SBIN0M0P44H",
+      "page_number": 2,
+      "label": "IFSC Code:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "rohit.verma47@ibl",
+      "page_number": 2,
+      "label": "UPI ID:"
+    }
+  ]
+}

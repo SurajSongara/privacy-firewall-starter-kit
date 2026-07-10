@@ -1,0 +1,48 @@
+{
+  "document": "synthetic/06-payslip-batch-3.pdf",
+  "description": "Synthetic 06 Payslip Batch 3",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "UUUPT6077R",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "093620424643",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "priya_patel350@hotmail.com",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "8288256550",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "ACCOUNT",
+      "text": "92617360594921",
+      "page_number": 1,
+      "label": "Account No:"
+    },
+    {
+      "detection_type": "IFSC",
+      "text": "HDFC0PGBDA7",
+      "page_number": 1,
+      "label": "IFSC:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "priya.patel83@ybl",
+      "page_number": 1,
+      "label": "UPI:"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from privacy_firewall.detectors.base import BaseDetector
-from privacy_firewall.detectors.utils import is_containment_duplicate
+from privacy_firewall.detectors.utils import is_containment_duplicate, is_in_slash_token
 from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
@@ -53,6 +53,8 @@ class PhoneDetector(BaseDetector):
                     for match in pattern.finditer(block.text):
                         raw = match.group()
                         if not self._validate_phone(raw):
+                            continue
+                        if is_in_slash_token(block.text, match.start(), match.end()):
                             continue
                         normalized = re.sub(r"[^\d]", "", raw)
                         if is_containment_duplicate(detections, normalized):

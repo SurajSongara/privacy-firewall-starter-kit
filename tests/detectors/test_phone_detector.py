@@ -124,3 +124,18 @@ class TestPhoneDetector:
         doc = Document(pages=[page])
         result = self.detector.scan(doc)
         assert result[0].bbox == bbox
+
+    def test_reject_bank_ref_between_slashes(self) -> None:
+        # 10-digit merchant/payee id inside "/BANK/NNNNNNNNNN/" is a
+        # transaction reference token, not a phone number.
+        doc = Document(pages=[_page("/CNRB/9179083184/Paym")])
+        result = self.detector.scan(doc)
+        assert result == []
+
+    def test_accept_phone_with_colon_prefix(self) -> None:
+        # OCR block ": 8989796847" (Branch Phone label sits in previous block)
+        # still detects because there is no slash next to the digits.
+        doc = Document(pages=[_page(": 8989796847")])
+        result = self.detector.scan(doc)
+        assert len(result) == 1
+        assert result[0].text == "8989796847"

@@ -7,8 +7,10 @@ import typer
 
 from privacy_firewall.detectors import (
     AadhaarDetector,
+    AccountDetector,
     DetectorRegistry,
     EmailDetector,
+    IFSCDetector,
     PANDetector,
     PhoneDetector,
     UpiDetector,
@@ -32,6 +34,8 @@ def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
         "email": EmailDetector,
         "phone": PhoneDetector,
         "upi": UpiDetector,
+        "ifsc": IFSCDetector,
+        "account": AccountDetector,
     }
 
     registry = DetectorRegistry()
@@ -43,6 +47,14 @@ def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
             raise typer.BadParameter(msg)
         registry.register(cls())
     return registry
+
+
+def _engine_help() -> str:
+    from privacy_firewall.ocr import list_engines
+
+    engines = list_engines()
+    default = engines[0] if engines else "(none)"
+    return f"OCR engine to use. Available: {', '.join(engines)}. [default: {default}]"
 
 
 def detect_cmd(
@@ -77,9 +89,15 @@ def detect_cmd(
         bool,
         typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
     ] = False,
+    ocr_engine: Annotated[
+        str | None,
+        typer.Option("--ocr-engine", help=_engine_help()),
+    ] = None,
 ) -> None:
     """Run PII detectors on a PDF and list all detections found."""
-    document, source = get_merged_document(input_pdf, force_ocr=ocr, auto=auto)
+    document, source = get_merged_document(
+        input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine,
+    )
 
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)

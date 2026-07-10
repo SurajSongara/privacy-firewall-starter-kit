@@ -22,26 +22,28 @@ class TestAadhaarDetector:
         assert self.detector.name == "aadhaar"
 
     def test_detect_continuous(self) -> None:
-        doc = Document(pages=[_page("Aadhaar: 123456789012")])
+        # 123456789010 is a valid Aadhaar (Verhoeff checksum)
+        doc = Document(pages=[_page("Aadhaar: 123456789010")])
         result = self.detector.scan(doc)
         assert len(result) == 1
-        assert result[0].text == "123456789012"
+        assert result[0].text == "123456789010"
         assert result[0].detection_type == "AADHAAR"
         assert result[0].confidence == 0.95
 
     def test_detect_formatted_spaces(self) -> None:
-        doc = Document(pages=[_page("Aadhaar: 1234 5678 9012")])
+        doc = Document(pages=[_page("Aadhaar: 1234 5678 9010")])
         result = self.detector.scan(doc)
         assert len(result) == 1
-        assert result[0].text == "123456789012"
+        assert result[0].text == "123456789010"
 
     def test_detect_formatted_hyphens(self) -> None:
-        doc = Document(pages=[_page("Aadhaar: 1234-5678-9012")])
+        doc = Document(pages=[_page("Aadhaar: 1234-5678-9010")])
         result = self.detector.scan(doc)
         assert len(result) == 1
-        assert result[0].text == "123456789012"
+        assert result[0].text == "123456789010"
 
     def test_multiple_aadhaars(self) -> None:
+        # Both are valid Aadhaar numbers (Verhoeff checksum)
         doc = Document(pages=[_page("First: 111122223333, Second: 444455556666")])
         result = self.detector.scan(doc)
         assert len(result) == 2
@@ -67,30 +69,30 @@ class TestAadhaarDetector:
         assert result == []
 
     def test_aadhaar_at_start(self) -> None:
-        doc = Document(pages=[_page("123456789012 is my Aadhaar")])
+        doc = Document(pages=[_page("123456789010 is my Aadhaar")])
         result = self.detector.scan(doc)
         assert len(result) == 1
 
     def test_aadhaar_at_end(self) -> None:
-        doc = Document(pages=[_page("My Aadhaar is 123456789012")])
+        doc = Document(pages=[_page("My Aadhaar is 123456789010")])
         result = self.detector.scan(doc)
         assert len(result) == 1
 
     def test_formatted_in_sentence(self) -> None:
-        doc = Document(pages=[_page("My Aadhaar is 1234 5678 9012, please note.")])
+        doc = Document(pages=[_page("My Aadhaar is 1234 5678 9010, please note.")])
         result = self.detector.scan(doc)
         assert len(result) == 1
-        assert result[0].text == "123456789012"
+        assert result[0].text == "123456789010"
 
     def test_deduplicates_continuous_and_formatted(self) -> None:
-        doc = Document(pages=[_page("Number: 123456789012 and 1234 5678 9012 are same")])
+        doc = Document(pages=[_page("Number: 123456789010 and 1234 5678 9010 are same")])
         result = self.detector.scan(doc)
         assert len(result) == 1
 
     def test_bbox_populated(self) -> None:
         bbox = BoundingBox(x0=10.0, y0=20.0, x1=300.0, y1=50.0)
         block = TextBlock(
-            block_id="b1", bbox=bbox, page_number=1, confidence=1.0, text="123456789012"
+            block_id="b1", bbox=bbox, page_number=1, confidence=1.0, text="123456789010"
         )
         page = Page(page_number=1, width=612.0, height=792.0, blocks=[block])
         doc = Document(pages=[page])
@@ -98,6 +100,28 @@ class TestAadhaarDetector:
         assert result[0].bbox == bbox
 
     def test_all_zeros_valid(self) -> None:
-        doc = Document(pages=[_page("000000000000")])
+        # 000000000003 is a valid Aadhaar (Verhoeff checksum)
+        doc = Document(pages=[_page("000000000003")])
         result = self.detector.scan(doc)
         assert len(result) == 1
+
+    def test_reject_txn_ref_between_slashes(self) -> None:
+        # 12-digit UPI transaction reference embedded in a slash-delimited
+        # descriptor (e.g. "UPI/DR/226251716424/Miss") — checksum passes but
+        # the structural context marks it as a transaction ref, not Aadhaar.
+        doc = Document(pages=[_page("UPI/DR/226251716424/Miss")])
+        result = self.detector.scan(doc)
+        assert result == []
+
+    def test_reject_txn_ref_trailing_slash(self) -> None:
+        # "<12digits>/SBIN" — number followed by a slash is a transaction ref.
+        doc = Document(pages=[_page("100224490779/SBIN")])
+        result = self.detector.scan(doc)
+        assert result == []
+
+    def test_accept_when_surrounded_by_whitespace(self) -> None:
+        # Same 12-digit number in a normal Aadhaar context is still detected.
+        doc = Document(pages=[_page("Aadhaar Number: 226251716424")])
+        result = self.detector.scan(doc)
+        assert len(result) == 1
+        assert result[0].text == "226251716424"

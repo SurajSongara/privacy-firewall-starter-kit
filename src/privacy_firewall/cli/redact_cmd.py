@@ -12,6 +12,14 @@ from privacy_firewall.engine.redaction import RedactionPlanner, RedactionType
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
 
 
+def _engine_help() -> str:
+    from privacy_firewall.ocr import list_engines
+
+    engines = list_engines()
+    default = engines[0] if engines else "(none)"
+    return f"OCR engine to use. Available: {', '.join(engines)}. [default: {default}]"
+
+
 def redact_cmd(
     input_pdf: Annotated[
         Path,
@@ -40,10 +48,10 @@ def redact_cmd(
     values_only: Annotated[
         bool,
         typer.Option(
-            "--values-only",
-            help="Redact only the matched value text, keeping labels visible.",
+            "--values-only/--full-block",
+            help="Redact only the matched value (default) or the full block (--full-block).",
         ),
-    ] = False,
+    ] = True,
     ocr: Annotated[
         bool,
         typer.Option("--ocr", help="Run OCR and merge with native text."),
@@ -52,6 +60,10 @@ def redact_cmd(
         bool,
         typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
     ] = False,
+    ocr_engine: Annotated[
+        str | None,
+        typer.Option("--ocr-engine", help=_engine_help()),
+    ] = None,
 ) -> None:
     """Scan a PDF for PII and produce a redacted copy."""
     type_map: dict[str, RedactionType] = {
@@ -65,7 +77,9 @@ def redact_cmd(
         msg = f"Unknown redaction type: {redaction_type!r}. Choose from: {choices}"
         raise typer.BadParameter(msg)
 
-    document, source = get_merged_document(input_pdf, force_ocr=ocr, auto=auto)
+    document, source = get_merged_document(
+        input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine,
+    )
 
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)

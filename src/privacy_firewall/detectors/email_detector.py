@@ -83,4 +83,11 @@ class EmailDetector(BaseDetector):
             return False
         if not domain or ".." in domain:
             return False
+        # Domain must end with a proper TLD (at least 2 chars)
+        tld = domain.split(".")[-1]
+        if len(tld) < 2:
+            return False
+        # Domain should not contain invalid characters
+        if not all(c.isalnum() or c in "-." for c in domain):
+            return False
         return True

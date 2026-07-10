@@ -6,7 +6,7 @@ from pathlib import Path
 from privacy_firewall.diagnostics import DocumentAnalyzer, PipelineType
 from privacy_firewall.engine.hybrid_merger import HybridMerger
 from privacy_firewall.models.document import Document
-from privacy_firewall.ocr import PaddleOCRAdapter
+from privacy_firewall.ocr.provider import OCRProvider
 
 
 def get_merged_document(
@@ -15,6 +15,7 @@ def get_merged_document(
     force_ocr: bool = False,
     auto: bool = False,
     native_doc: Document | None = None,
+    ocr_provider: str | None = None,
 ) -> tuple[Document, str]:
     """Return the best available document for detection.
 
@@ -23,6 +24,7 @@ def get_merged_document(
         force_ocr: When ``True``, always run OCR and merge with native.
         auto: When ``True``, run diagnostics and decide automatically.
         native_doc: Pre-parsed native document (avoids re-parsing).
+        ocr_provider: OCR adapter name.  ``None`` uses the registry default.
 
     Returns:
         A ``(document, source)`` tuple where *source* is one of
@@ -30,50 +32,80 @@ def get_merged_document(
     """
     from privacy_firewall.parsers.pdf_parser import PDFParser
 
-    # Always have native available
     if native_doc is None:
         native_doc = PDFParser(pdf_path).parse()
 
-    # No OCR requested → native
     if not force_ocr and not auto:
         return native_doc, "native"
 
-    # Auto mode: decide based on diagnostics
     if auto:
         report = DocumentAnalyzer(pdf_path).analyze()
         pipeline = report.recommended_pipeline
         if pipeline == PipelineType.NATIVE:
             return native_doc, "native"
 
-    # Run OCR
-    ocr_doc = _run_ocr(pdf_path)
+    ocr_doc = _run_ocr(pdf_path, provider=ocr_provider)
 
-    # OCR only (no native text) → pure OCR
     if not native_doc.pages or all(
         not any(hasattr(b, "text") and b.text for b in p.blocks)
         for p in native_doc.pages
     ):
         return ocr_doc, "ocr"
 
-    # Hybrid: merge native + OCR
     merge_result = HybridMerger.merge(native_doc, ocr_doc)
     return merge_result.document, "hybrid"
 
 
-def _run_ocr(pdf_path: Path) -> Document:
-    """Run PaddleOCR on a PDF file.
+def _run_ocr(pdf_path: Path, provider: str | None = None) -> Document:
+    """Run the chosen OCR adapter on a PDF file.
 
     Args:
         pdf_path: Path to the PDF.
+        provider: OCR adapter name, or ``None`` for registry default.
 
     Returns:
         A ``Document`` with OCR-extracted blocks.
 
     Raises:
-        ImportError: If paddleocr is not installed.
+        ImportError: If the required OCR package is not installed.
     """
-    adapter = PaddleOCRAdapter()
+    adapter = _get_adapter(provider)
     return adapter.process(pdf_path)
+
+
+def _get_adapter(name: str | None = None) -> OCRProvider:
+    """Look up an OCR adapter from the global registry.
+
+    Args:
+        name: Adapter name, or ``None`` for the registry default.
+
+    Returns:
+        An ``OCRProvider`` instance.
+
+    Raises:
+        ValueError: If the name is unknown or no default is set.
+    """
+    from privacy_firewall.ocr import get_registry
+
+    registry = get_registry()
+
+    if name is None:
+        cls = registry.get_default()
+        if cls is None:
+            msg = (
+                "No OCR engine available. Install one of:\n"
+                "  pip install tesserocr   (Tesseract)\n"
+                "  pip install paddleocr   (PaddleOCR)"
+            )
+            raise ValueError(msg)
+        return cls()
+
+    cls = registry.get(name)
+    if cls is None:
+        available = ", ".join(registry.names) or "(none)"
+        msg = f"Unknown OCR engine: {name!r}. Available: {available}"
+        raise ValueError(msg)
+    return cls()
 
 
 def get_pipeline_summary(source: str) -> str:

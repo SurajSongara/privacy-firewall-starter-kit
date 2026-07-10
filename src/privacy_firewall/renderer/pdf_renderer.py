@@ -86,6 +86,9 @@ class PDFRenderer:
         strips the underlying text/images.  HIGHLIGHT redactions use
         ``draw_rect`` (visual-only).
 
+        Uses PyMuPDF's ``search_for`` to find the exact text bbox for
+        precise redaction, falling back to the detection bbox if not found.
+
         Args:
             doc: An open PyMuPDF document.
             plan: The redaction plan to apply.
@@ -98,24 +101,34 @@ class PDFRenderer:
 
             has_destructive = False
             for redaction in page_redactions:
-                rect = fitz.Rect(
-                    redaction.bbox.x0,
-                    redaction.bbox.y0,
-                    redaction.bbox.x1,
-                    redaction.bbox.y1,
-                )
+                # Try to find the exact text bbox using PyMuPDF's search
+                search_results = page.search_for(redaction.detection.text)
 
-                if redaction.redaction_type in (RedactionType.REPLACE, RedactionType.BLACK_BAR):
-                    page.add_redact_annot(rect, fill=PDFRenderer.BLACK_BAR_COLOR)
-                    has_destructive = True
-                elif redaction.redaction_type == RedactionType.HIGHLIGHT:
-                    page.draw_rect(
-                        rect,
-                        color=None,
-                        fill=PDFRenderer.HIGHLIGHT_COLOR,
-                        fill_opacity=PDFRenderer.HIGHLIGHT_OPACITY,
-                        width=0,
-                    )
+                if search_results:
+                    # Redact ALL occurrences of this text
+                    rects = search_results
+                else:
+                    # Fall back to the detection bbox
+                    rects = [fitz.Rect(
+                        redaction.bbox.x0,
+                        redaction.bbox.y0,
+                        redaction.bbox.x1,
+                        redaction.bbox.y1,
+                    )]
+
+                for rect in rects:
+                    if redaction.redaction_type in (RedactionType.REPLACE, RedactionType.BLACK_BAR):
+                        # Add text parameter to ensure the text is removed
+                        page.add_redact_annot(rect, text='', fill=PDFRenderer.BLACK_BAR_COLOR)
+                        has_destructive = True
+                    elif redaction.redaction_type == RedactionType.HIGHLIGHT:
+                        page.draw_rect(
+                            rect,
+                            color=None,
+                            fill=PDFRenderer.HIGHLIGHT_COLOR,
+                            fill_opacity=PDFRenderer.HIGHLIGHT_OPACITY,
+                            width=0,
+                        )
 
             if has_destructive:
                 page.apply_redactions()

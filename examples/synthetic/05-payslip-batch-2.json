@@ -1,0 +1,48 @@
+{
+  "document": "synthetic/05-payslip-batch-2.pdf",
+  "description": "Synthetic 05 Payslip Batch 2",
+  "expectations": [
+    {
+      "detection_type": "PAN",
+      "text": "NNNPB4388M",
+      "page_number": 1,
+      "label": "PAN:"
+    },
+    {
+      "detection_type": "AADHAAR",
+      "text": "693585311795",
+      "page_number": 1,
+      "label": "Aadhaar:"
+    },
+    {
+      "detection_type": "EMAIL",
+      "text": "pooja_gupta242@outlook.com",
+      "page_number": 1,
+      "label": "Email:"
+    },
+    {
+      "detection_type": "PHONE",
+      "text": "6182300696",
+      "page_number": 1,
+      "label": "Phone:"
+    },
+    {
+      "detection_type": "ACCOUNT",
+      "text": "395085481530829",
+      "page_number": 1,
+      "label": "Account No:"
+    },
+    {
+      "detection_type": "IFSC",
+      "text": "UTIB074TAI6",
+      "page_number": 1,
+      "label": "IFSC:"
+    },
+    {
+      "detection_type": "UPI",
+      "text": "pooja.gupta66@okicicibank",
+      "page_number": 1,
+      "label": "UPI:"
+    }
+  ]
+}

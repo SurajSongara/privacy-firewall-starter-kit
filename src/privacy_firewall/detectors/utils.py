@@ -38,3 +38,16 @@ def is_containment_duplicate(detections: list[Detection], normalized: str) -> bo
         if normalized in existing or existing in normalized:
             return True
     return False
+
+
+def is_in_slash_token(text: str, start: int, end: int) -> bool:
+    """Return ``True`` if the match sits inside a slash-delimited token.
+
+    Bank statement transaction descriptors embed digit runs between slashes
+    (e.g. ``UPI/DR/226251716424/Miss`` or ``/CNRB/9179083184/Paym``). Those
+    runs are transaction references, not personal PII. Any match immediately
+    preceded or followed by ``/`` is treated as a reference token.
+    """
+    before = text[start - 1] if start > 0 else ""
+    after = text[end] if end < len(text) else ""
+    return before == "/" or after == "/"

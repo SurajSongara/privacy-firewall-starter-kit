@@ -52,6 +52,35 @@ def spans_overlap(a: Span, b: Span) -> bool:
     return a.start < b.end and b.start < a.end
 
 
+def bboxes_overlap(a: Detection, b: Detection) -> bool:
+    """Check whether two detections have overlapping bounding boxes.
+
+    This is used in addition to span overlap to prevent merging
+    detections that are in different physical locations on the page.
+
+    Args:
+        a: First detection.
+        b: Second detection.
+
+    Returns:
+        True if the bounding boxes overlap significantly.
+    """
+    # If bboxes don't overlap at all, don't merge
+    if (a.bbox.x1 < b.bbox.x0 or b.bbox.x1 < a.bbox.x0 or
+            a.bbox.y1 < b.bbox.y0 or b.bbox.y1 < a.bbox.y0):
+        return False
+    # Calculate intersection area
+    x_overlap = max(0, min(a.bbox.x1, b.bbox.x1) - max(a.bbox.x0, b.bbox.x0))
+    y_overlap = max(0, min(a.bbox.y1, b.bbox.y1) - max(a.bbox.y0, b.bbox.y0))
+    intersection = x_overlap * y_overlap
+    # Calculate union area
+    area_a = (a.bbox.x1 - a.bbox.x0) * (a.bbox.y1 - a.bbox.y0)
+    area_b = (b.bbox.x1 - b.bbox.x0) * (b.bbox.y1 - b.bbox.y0)
+    union = area_a + area_b - intersection
+    # Merge only if IoU > 0.5 (significant overlap)
+    return (intersection / union) > 0.5 if union > 0 else False
+
+
 @dataclass
 class MergeRecord:
     """Records the outcome of merging one detection into another.
@@ -130,7 +159,7 @@ class FusionEngine:
 
         result: list[Detection] = []
         for d in sorted_detections:
-            if result and spans_overlap(result[-1].span, d.span):
+            if result and spans_overlap(result[-1].span, d.span) and bboxes_overlap(result[-1], d):
                 winner, loser = _resolve(result[-1], d)
                 log.append(
                     MergeRecord(
