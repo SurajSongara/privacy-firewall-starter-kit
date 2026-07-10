@@ -46,7 +46,7 @@ Principles: Precision before UI → Policy decides, user overrides → ReviewPla
 
 | # | Task | Status |
 |---|------|--------|
-| P001 | Detection Evidence — `detection_id` + `reasons` on Detection | ⏳ Pending |
+| P001 | Detection Evidence — `detection_id` + `reasons` on Detection | ✅ Complete |
 | P002 | Context Scoring — label-proximity confidence adjustment | ⏳ Pending |
 | P003 | FP Fixes — Aadhaar Verhoeff, phone prefix, email TLD | ⏳ Pending |
 | P004 | Precision Benchmark — FP tracking + regression baseline | ⏳ Pending |

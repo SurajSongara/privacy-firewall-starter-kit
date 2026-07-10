@@ -94,6 +94,10 @@ class AadhaarDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.95,
+                            reasons=(
+                                "matches 12-digit Aadhaar format",
+                                "Verhoeff checksum passed",
+                            ),
                         )
                     )
 
@@ -121,6 +125,10 @@ class AadhaarDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.95,
+                            reasons=(
+                                "matches 12-digit Aadhaar format",
+                                "Verhoeff checksum passed",
+                            ),
                         )
                     )
 

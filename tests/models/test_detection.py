@@ -57,3 +57,54 @@ class TestDetection:
                 page_number=1,
                 confidence=1.1,
             )
+
+
+def _detection(**overrides: object) -> Detection:
+    fields: dict[str, object] = {
+        "detector_name": "pan",
+        "detection_type": "PAN",
+        "text": "ABCDE1234F",
+        "span": Span(start=0, end=10),
+        "bbox": BoundingBox(x0=0.0, y0=0.0, x1=100.0, y1=20.0),
+        "page_number": 1,
+        "confidence": 0.9,
+    }
+    fields.update(overrides)
+    return Detection.model_validate(fields)
+
+
+class TestDetectionEvidence:
+    def test_reasons_default_empty(self) -> None:
+        assert _detection().reasons == ()
+
+    def test_reasons_stored(self) -> None:
+        d = _detection(reasons=("matches PAN format", "checksum passed"))
+        assert d.reasons == ("matches PAN format", "checksum passed")
+
+    def test_detection_id_deterministic(self) -> None:
+        assert _detection().detection_id == _detection().detection_id
+
+    def test_detection_id_ignores_detector_confidence_reasons(self) -> None:
+        a = _detection(detector_name="pan", confidence=0.9)
+        b = _detection(detector_name="regex_pan", confidence=0.5, reasons=("x",))
+        assert a.detection_id == b.detection_id
+
+    def test_detection_id_changes_with_text(self) -> None:
+        assert _detection(text="FGHIJ5678K").detection_id != _detection().detection_id
+
+    def test_detection_id_changes_with_page(self) -> None:
+        assert _detection(page_number=2).detection_id != _detection().detection_id
+
+    def test_detection_id_changes_with_span(self) -> None:
+        assert (
+            _detection(span=Span(start=5, end=15)).detection_id != _detection().detection_id
+        )
+
+    def test_detection_id_changes_with_type(self) -> None:
+        assert (
+            _detection(detection_type="ACCOUNT").detection_id != _detection().detection_id
+        )
+
+    def test_detection_id_serialized(self) -> None:
+        dumped = _detection().model_dump()
+        assert dumped["detection_id"] == _detection().detection_id

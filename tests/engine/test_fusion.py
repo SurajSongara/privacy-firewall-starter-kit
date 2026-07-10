@@ -206,3 +206,20 @@ class TestFusionEngine:
         result = FusionResult(detections=[], merge_log=[])
         assert result.detections == []
         assert result.merge_log == []
+
+    def test_merge_absorbs_loser_reasons(self) -> None:
+        d1 = _detection(detector_name="email", confidence=0.7, start=0, end=15)
+        d1 = d1.model_copy(update={"reasons": ("matches email format",)})
+        d2 = _detection(detector_name="email", confidence=0.95, start=5, end=15)
+        d2 = d2.model_copy(update={"reasons": ("valid domain",)})
+        result = self.engine.fuse([d1, d2])
+        assert len(result.detections) == 1
+        assert result.detections[0].reasons == ("valid domain", "matches email format")
+
+    def test_merge_deduplicates_reasons(self) -> None:
+        d1 = _detection(detector_name="email", confidence=0.7, start=0, end=15)
+        d1 = d1.model_copy(update={"reasons": ("matches email format",)})
+        d2 = _detection(detector_name="email", confidence=0.95, start=5, end=15)
+        d2 = d2.model_copy(update={"reasons": ("matches email format",)})
+        result = self.engine.fuse([d1, d2])
+        assert result.detections[0].reasons == ("matches email format",)

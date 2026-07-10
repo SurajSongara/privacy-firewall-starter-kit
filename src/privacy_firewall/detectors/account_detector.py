@@ -129,6 +129,10 @@ class AccountDetector(BaseDetector):
                                 bbox=match_bbox,
                                 page_number=page.page_number,
                                 confidence=0.85,
+                                reasons=(
+                                    "9-18 digit number",
+                                    "follows an account label (e.g. 'A/c No')",
+                                ),
                             )
                         )
 
@@ -167,6 +171,14 @@ class AccountDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.85 if label_from_prev else 0.70,
+                            reasons=(
+                                ("standalone number of common account length (11-15 digits)",)
+                                + (
+                                    ("previous block ends with an account label",)
+                                    if label_from_prev
+                                    else ()
+                                )
+                            ),
                         )
                     )
 

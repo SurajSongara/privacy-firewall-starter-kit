@@ -161,6 +161,7 @@ class FusionEngine:
         for d in sorted_detections:
             if result and spans_overlap(result[-1].span, d.span) and bboxes_overlap(result[-1], d):
                 winner, loser = _resolve(result[-1], d)
+                winner = _absorb_reasons(winner, loser)
                 log.append(
                     MergeRecord(
                         kept=winner,
@@ -196,6 +197,25 @@ def _resolve(a: Detection, b: Detection) -> tuple[Detection, Detection]:
     if a.confidence >= b.confidence:
         return a, b
     return b, a
+
+
+def _absorb_reasons(winner: Detection, loser: Detection) -> Detection:
+    """Carry the loser's evidence over to the winner when merging.
+
+    Both detections describe the same entity, so the loser's reasons are
+    still valid evidence; they are appended (deduplicated, order preserved).
+
+    Args:
+        winner: The detection that is kept.
+        loser: The detection being merged away.
+
+    Returns:
+        The winner, extended with any reasons unique to the loser.
+    """
+    extra = tuple(r for r in loser.reasons if r not in winner.reasons)
+    if not extra:
+        return winner
+    return winner.model_copy(update={"reasons": winner.reasons + extra})
 
 
 def _merge_reason(winner: Detection, loser: Detection) -> str:

@@ -61,6 +61,10 @@ class EmailDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.9,
+                            reasons=(
+                                "matches email address format",
+                                "local part and domain are structurally valid",
+                            ),
                         )
                     )
 

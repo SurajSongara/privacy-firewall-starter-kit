@@ -88,6 +88,10 @@ class IFSCDetector(BaseDetector):
                     if is_exact_duplicate(detections, ifsc):
                         continue
 
+                    reasons = ["matches IFSC format (bank code + '0' + branch code)"]
+                    if ifsc[:4] in KNOWN_BANK_CODES:
+                        reasons.append(f"recognised bank code '{ifsc[:4]}'")
+
                     match_bbox = (
                         block.bbox_for_span(match.start(1), match.end(1))
                         if values_only
@@ -103,6 +107,7 @@ class IFSCDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.95,
+                            reasons=tuple(reasons),
                         )
                     )
 

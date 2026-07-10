@@ -63,6 +63,10 @@ class PANDetector(BaseDetector):
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.95,
+                            reasons=(
+                                "matches PAN format",
+                                f"holder-type code '{pan[3]}' is valid",
+                            ),
                         )
                     )
 
