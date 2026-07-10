@@ -282,9 +282,10 @@ PAGE_HTML = r"""<!doctype html>
         <stop stop-color="#818cf8"/><stop offset="1" stop-color="#4f46e5"/>
       </linearGradient></defs>
     </svg>
-    <div><div class="name">Privacy Firewall</div><div class="sub">Redaction review</div></div>
-  </div>
-  <span class="meta" id="meta"></span>
+   <div><div class="name">Privacy Firewall</div><div class="sub">Redaction review</div></div>
+   </div>
+   <button class="btn" id="home-btn" style="display:none" title="Back to dashboard">&larr; Dashboard</button>
+   <span class="meta" id="meta"></span>
   <span class="spacer"></span>
   <span class="toolgroup" id="pagenav" title="Jump between pages">
     <button id="page-prev">&#9666;</button>
@@ -954,7 +955,14 @@ async function rerunWithOcr() {
   document.getElementById("load-spinner").style.display = "";
   document.getElementById("load-stage").className = "stage";
   bootStart = Date.now();
-  boot();
+/* ---------- dashboard link (studio mode only) ---------- */
+if (location.search.includes("studio")) {
+  const hb = document.getElementById("home-btn");
+  hb.style.display = "";
+  hb.addEventListener("click", () => { window.location.href = "/"; });
+}
+
+boot();
 }
 
 document.getElementById("save").addEventListener("click", async () => {
@@ -986,6 +994,227 @@ document.getElementById("apply").addEventListener("click", async () => {
 });
 
 boot();
+</script>
+</body>
+</html>
+"""
+
+STUDIO_HTML = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Firewall — Studio</title>
+<style>
+  :root {
+    --accent: #6366f1; --accent-strong: #4f46e5;
+    --bg: #f1f5f9; --panel: #ffffff; --line: #e2e8f0;
+    --text: #0f172a; --muted: #64748b;
+    --shadow: 0 1px 2px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.06);
+    --shadow-lg: 0 4px 8px rgba(15,23,42,.08), 0 12px 32px rgba(15,23,42,.14);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); background: var(--bg);
+    font: 14px/1.5 -apple-system, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+    background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 30;
+  }
+  .logo { display: flex; align-items: center; gap: 9px; }
+  .logo svg { width: 26px; height: 26px; }
+  .logo .name { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+  .logo .sub { font-size: 11px; color: var(--muted); margin-top: -2px; }
+  header .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background .12s, border-color .12s, box-shadow .12s;
+  }
+  .btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    border-color: transparent; color: #fff; box-shadow: 0 1px 3px rgba(79,70,229,.4);
+  }
+  .btn.primary:hover { filter: brightness(1.07); }
+  main { max-width: 940px; margin: 0 auto; padding: 28px 20px 48px; }
+  h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.02em; }
+  .lede { color: var(--muted); margin: 0 0 22px; }
+
+  /* drop zone */
+  #drop {
+    border: 2px dashed #cbd5e1; border-radius: 16px; background: var(--panel);
+    padding: 30px; text-align: center; transition: border-color .12s, background .12s;
+    cursor: pointer; box-shadow: var(--shadow);
+  }
+  #drop.hover { border-color: var(--accent); background: #eef2ff; }
+  #drop .big { font-size: 15px; font-weight: 600; }
+  #drop .small { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  #drop input[type=file] { display: none; }
+
+  /* document list */
+  .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); font-weight: 700; margin: 28px 0 12px; }
+  #docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .doc {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 16px; display: flex; flex-direction: column; gap: 10px;
+    transition: box-shadow .12s, transform .12s;
+  }
+  .doc:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+  .doc .ico { width: 34px; height: 34px; border-radius: 8px; background: #eef2ff;
+    color: var(--accent-strong); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12px; flex-shrink: 0; }
+  .doc .top { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+  .doc .nm { font-weight: 600; word-break: break-all; }
+  .doc .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .doc .row { display: flex; align-items: center; gap: 8px; }
+  .doc .tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: #ecfdf5; color: #065f46; }
+  .doc .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .doc .actions .btn { flex: 1; padding: 7px 0; text-align: center; }
+  .empty { color: var(--muted); text-align: center; padding: 26px; border: 1px dashed #cbd5e1;
+    border-radius: 14px; }
+  #toasts { position: fixed; bottom: 20px; right: 20px; z-index: 100; display: flex;
+    flex-direction: column; gap: 8px; }
+  .toast { background: #0f172a; color: #f8fafc; border-radius: 10px; padding: 10px 16px;
+    font-size: 13px; box-shadow: var(--shadow-lg); max-width: 420px; word-break: break-word; }
+  .toast.warn { background: #92400e; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M12 2 4 5.5v5.6c0 4.9 3.4 9.5 8 10.9 4.6-1.4 8-6 8-10.9V5.5L12 2Z"
+            fill="url(#g)" stroke="#4338ca" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M8.6 12.1l2.3 2.3 4.5-4.6" stroke="#fff" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <defs><linearGradient id="g" x1="4" y1="2" x2="20" y2="22">
+        <stop stop-color="#818cf8"/><stop offset="1" stop-color="#4f46e5"/>
+      </linearGradient></defs>
+    </svg>
+    <div><div class="name">Privacy Firewall</div><div class="sub">Studio</div></div>
+  </div>
+  <span class="spacer"></span>
+  <button class="btn primary" id="upload-btn">Upload PDF</button>
+  <input type="file" id="file" accept="application/pdf" multiple>
+</header>
+
+<main>
+  <h1>Review documents for PII</h1>
+  <p class="lede">Open a PDF to detect and redact sensitive information. Everything runs locally on your machine.</p>
+
+  <div id="drop">
+    <div class="big">Drop PDFs here, or click to choose</div>
+    <div class="small">Files are saved into this workspace folder and stay on your computer.</div>
+    <input type="file" id="drop-file" accept="application/pdf" multiple>
+  </div>
+
+  <div class="section-title">Documents in this workspace</div>
+  <div id="docs"></div>
+</main>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function fmtSize(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1024*1024) return (b/1024).toFixed(1) + " KB";
+  return (b/1024/1024).toFixed(1) + " MB";
+}
+function fmtDate(t) {
+  const d = new Date(t * 1000);
+  return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+}
+function toast(msg, kind) {
+  const el = document.createElement("div");
+  el.className = "toast" + (kind === "warn" ? " warn" : "");
+  el.textContent = msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+async function uploadFiles(fileList) {
+  for (const f of fileList) {
+    const fd = new FormData();
+    fd.append("file", f);
+    try {
+      const res = await fetch("/api/upload", {method: "POST", body: fd});
+      if (!res.ok) {
+        const txt = await res.text();
+        toast("Upload failed: " + txt, "warn");
+        continue;
+      }
+      toast("Uploaded " + f.name);
+    } catch (err) {
+      toast("Upload failed: " + err.message, "warn");
+    }
+  }
+  refresh();
+}
+
+async function refresh() {
+  const docs = document.getElementById("docs");
+  let data;
+  try {
+    data = await (await fetch("/api/documents")).json();
+  } catch (err) {
+    docs.innerHTML = '<div class="empty">Could not load documents.</div>';
+    return;
+  }
+  if (!data.documents.length) {
+    docs.innerHTML = '<div class="empty">No PDFs yet. Drop a file above to get started.</div>';
+    return;
+  }
+  docs.innerHTML = "";
+  data.documents.forEach(d => {
+    const card = document.createElement("div");
+    card.className = "doc";
+    card.innerHTML = `
+      <div class="top">
+        <div class="ico">PDF</div>
+        <div style="min-width:0">
+          <div class="nm">${esc(d.name)}</div>
+          <div class="meta">${fmtSize(d.size)} · ${fmtDate(d.modified)}</div>
+        </div>
+      </div>
+      <div class="row">${d.has_plan ? '<span class="tag">Resume available</span>' : ''}</div>
+      <div class="actions">
+        <button class="btn primary" data-open="${esc(d.id)}">Open</button>
+      </div>`;
+    card.querySelector("[data-open]").addEventListener("click", () => {
+      window.location.href = "/review/" + d.id + "/?studio=1";
+    });
+    docs.appendChild(card);
+  });
+}
+
+/* upload controls */
+document.getElementById("upload-btn").addEventListener("click", () =>
+  document.getElementById("file").click());
+document.getElementById("file").addEventListener("change", e => uploadFiles(e.target.files));
+document.getElementById("drop-file").addEventListener("change", e => uploadFiles(e.target.files));
+
+const drop = document.getElementById("drop");
+["dragenter", "dragover"].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hover"); }));
+["dragleave", "drop"].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("hover"); }));
+drop.addEventListener("click", () => document.getElementById("drop-file").click());
+drop.addEventListener("drop", e => {
+  if (e.dataTransfer && e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+});
+
+refresh();
+setInterval(refresh, 4000);
 </script>
 </body>
 </html>

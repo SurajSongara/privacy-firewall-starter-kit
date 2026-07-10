@@ -1,5 +1,6 @@
 """Entry-point module for the privacy-firewall CLI."""
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -33,20 +34,44 @@ def callback(
     version_flag: Annotated[  # noqa: FBT001
         bool, typer.Option("--version", help="Show the version and exit.")
     ] = False,
+    workspace: Annotated[
+        Path,
+        typer.Option(
+            "--workspace",
+            help="Folder scanned for PDFs and used to store uploads (default: current directory).",
+        ),
+    ] = Path.cwd(),
+    port: Annotated[
+        int | None,
+        typer.Option("--port", help="Port for the local server (default: auto)."),
+    ] = None,
+    no_browser: Annotated[
+        bool,
+        typer.Option("--no-browser", help="Don't open the browser automatically."),
+    ] = False,
 ) -> None:
-    """CLI callback that shows version info or the default banner.
+    """CLI callback: launch the local Studio dashboard with no arguments.
 
     Args:
         ctx: The Typer context.
         version_flag: When True, prints the installed package version and exits.
+        workspace: Folder scanned for PDFs and used to store uploads.
+        port: Fixed port, or ``None`` for an OS-assigned free port.
+        no_browser: When True, don't open the browser automatically.
     """
     if version_flag:
         from importlib.metadata import version
 
         typer.echo(version("privacy_firewall"))
         raise typer.Exit()
-    if ctx.invoked_subcommand is None:
-        typer.echo("Offline-first PII Detection & Redaction Engine")
+    if ctx.invoked_subcommand is not None:
+        return
+    try:
+        from privacy_firewall.ui.studio import run_studio
+    except ImportError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    run_studio(workspace, port=port, open_browser=not no_browser)
 
 
 def entry_point() -> None:
