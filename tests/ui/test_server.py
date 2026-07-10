@@ -22,6 +22,7 @@ def client(tmp_path: Path) -> TestClient:
     page = doc.new_page()
     page.insert_text((50, 100), "PAN: AAAAA1111A", fontsize=12)
     page.insert_text((50, 140), "Email: user@example.com", fontsize=12)
+    page.insert_text((50, 180), "Customer: Ramesh Kumar", fontsize=12)
     doc.save(str(path))
     doc.close()
     session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"])
@@ -60,9 +61,7 @@ class TestReviewServer:
         assert updated["decision"] == "keep"
 
     def test_decision_unknown_id_404(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/decision", json={"detection_id": "nope", "decision": "keep"}
-        )
+        response = client.post("/api/decision", json={"detection_id": "nope", "decision": "keep"})
         assert response.status_code == 404
 
     def test_decision_invalid_value_422(self, client: TestClient) -> None:
@@ -73,6 +72,40 @@ class TestReviewServer:
         )
         assert response.status_code == 422
 
+    def test_text_endpoint(self, client: TestClient) -> None:
+        body = client.get("/api/text/1").json()
+        assert any(w["text"] == "Ramesh" for w in body["words"])
+
+    def test_text_out_of_range_404(self, client: TestClient) -> None:
+        assert client.get("/api/text/99").status_code == 404
+
+    def test_mark_and_remove_round_trip(self, client: TestClient) -> None:
+        response = client.post("/api/mark", json={"text": "Ramesh Kumar", "label": "name"})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["added"] == 1
+        entry = body["entries"][0]
+        assert entry["type"] == "NAME"
+        assert entry["detector"] == "manual"
+        assert entry["effective_action"] == "redact"
+
+        plan = client.get("/api/plan").json()
+        assert any(e["detection_id"] == entry["detection_id"] for e in plan["entries"])
+
+        response = client.post("/api/remove", json={"detection_id": entry["detection_id"]})
+        assert response.status_code == 200
+        plan = client.get("/api/plan").json()
+        assert all(e["detection_id"] != entry["detection_id"] for e in plan["entries"])
+
+    def test_mark_blank_text_422(self, client: TestClient) -> None:
+        response = client.post("/api/mark", json={"text": "   ", "label": "NAME"})
+        assert response.status_code == 422
+
+    def test_remove_non_manual_404(self, client: TestClient) -> None:
+        entry = client.get("/api/plan").json()["entries"][0]
+        response = client.post("/api/remove", json={"detection_id": entry["detection_id"]})
+        assert response.status_code == 404
+
     def test_apply(self, client: TestClient, tmp_path: Path) -> None:
         out = tmp_path / "redacted.pdf"
         response = client.post("/api/apply", json={"output_path": str(out)})
@@ -81,3 +114,52 @@ class TestReviewServer:
         assert body["redactions"] >= 1
         assert Path(body["output_path"]).exists()
         assert Path(body["plan_path"]).exists()
+        with fitz.open(out) as doc:
+            text = doc[0].get_text()
+        assert "*****" in text
+
+    def test_apply_black_bar_style(self, client: TestClient, tmp_path: Path) -> None:
+        out = tmp_path / "bars.pdf"
+        response = client.post(
+            "/api/apply", json={"output_path": str(out), "redaction_type": "black_bar"}
+        )
+        assert response.status_code == 200
+        with fitz.open(out) as doc:
+            text = doc[0].get_text()
+        assert "AAAAA1111A" not in text
+        assert "*****" not in text
+
+    def test_apply_invalid_redaction_type_422(self, client: TestClient) -> None:
+        response = client.post("/api/apply", json={"redaction_type": "sparkles"})
+        assert response.status_code == 422
+
+    def test_status_ready(self, client: TestClient) -> None:
+        assert client.get("/api/status").json() == {"status": "ready", "detail": ""}
+
+    def test_preview_png(self, client: TestClient) -> None:
+        response = client.get("/api/preview/1")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content[:8] == b"\x89PNG\r\n\x1a\n"
+        assert client.get("/api/preview/99").status_code == 404
+
+    def test_lazy_session_gates_endpoints(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.pdf"
+        doc = fitz.open()
+        doc.new_page().insert_text((50, 100), "PAN: AAAAA1111A", fontsize=12)
+        doc.save(str(path))
+        doc.close()
+        session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"], lazy=True)
+        client = TestClient(create_app(session))
+
+        assert client.get("/api/status").json()["status"] == "starting"
+        assert client.get("/api/plan").status_code == 425
+        assert client.post("/api/save", json={}).status_code == 425
+        # A run that has not finished blocks rerun requests.
+        session.status = "ocr"
+        assert client.post("/api/rerun", json={}).status_code == 409
+
+        session.status = "starting"
+        session.run()
+        assert client.get("/api/status").json()["status"] == "ready"
+        assert client.get("/api/plan").status_code == 200

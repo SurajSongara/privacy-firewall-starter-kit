@@ -1,6 +1,8 @@
 """OCR pipeline — decides whether to invoke OCR and merges results."""
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from privacy_firewall.diagnostics import DocumentAnalyzer, PipelineType
@@ -16,6 +18,7 @@ def get_merged_document(
     auto: bool = False,
     native_doc: Document | None = None,
     ocr_provider: str | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> tuple[Document, str]:
     """Return the best available document for detection.
 
@@ -25,6 +28,9 @@ def get_merged_document(
         auto: When ``True``, run diagnostics and decide automatically.
         native_doc: Pre-parsed native document (avoids re-parsing).
         ocr_provider: OCR adapter name.  ``None`` uses the registry default.
+        progress: Optional callback invoked with a short stage label
+            (``"parsing"``, ``"analyzing"``, ``"ocr"``, ``"merging"``) as
+            the pipeline advances — lets callers report progress.
 
     Returns:
         A ``(document, source)`` tuple where *source* is one of
@@ -32,26 +38,33 @@ def get_merged_document(
     """
     from privacy_firewall.parsers.pdf_parser import PDFParser
 
+    def report(stage: str) -> None:
+        if progress is not None:
+            progress(stage)
+
     if native_doc is None:
+        report("parsing")
         native_doc = PDFParser(pdf_path).parse()
 
     if not force_ocr and not auto:
         return native_doc, "native"
 
     if auto:
-        report = DocumentAnalyzer(pdf_path).analyze()
-        pipeline = report.recommended_pipeline
+        report("analyzing")
+        report_result = DocumentAnalyzer(pdf_path).analyze()
+        pipeline = report_result.recommended_pipeline
         if pipeline == PipelineType.NATIVE:
             return native_doc, "native"
 
+    report("ocr")
     ocr_doc = _run_ocr(pdf_path, provider=ocr_provider)
 
     if not native_doc.pages or all(
-        not any(hasattr(b, "text") and b.text for b in p.blocks)
-        for p in native_doc.pages
+        not any(hasattr(b, "text") and b.text for b in p.blocks) for p in native_doc.pages
     ):
         return ocr_doc, "ocr"
 
+    report("merging")
     merge_result = HybridMerger.merge(native_doc, ocr_doc)
     return merge_result.document, "hybrid"
 

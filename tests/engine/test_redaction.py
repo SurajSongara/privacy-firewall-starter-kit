@@ -169,7 +169,7 @@ class TestRedactionPlanner:
     def test_plan_default_replacement_text(self) -> None:
         detections = [_detection()]
         plan = self.planner.plan(self.doc, detections)
-        assert plan.redactions[0].replacement_text == "[REDACTED]"
+        assert plan.redactions[0].replacement_text == "*****"
 
     def test_plan_honours_custom_default_type(self) -> None:
         detections = [_detection()]
