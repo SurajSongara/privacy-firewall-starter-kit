@@ -29,6 +29,7 @@ def _native_pdf() -> None:
     )
     page.insert_text((50, 50), text, fontsize=11)
     out = _out_dir() / "native" / "sbi_statement_native.pdf"
+    out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
     doc.close()
 
@@ -56,6 +57,7 @@ def _scanned_pdf() -> None:
     img_bytes = pix.tobytes(output="png")
     page.insert_image(fitz.Rect(50, 50, 545, 792), stream=img_bytes)
     out = _out_dir() / "scanned" / "scanned_doc.pdf"
+    out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
     doc.close()
 
@@ -71,6 +73,7 @@ def _hybrid_pdf() -> None:
     img_bytes = pix.tobytes(output="png")
     page.insert_image(fitz.Rect(50, 200, 250, 300), stream=img_bytes)
     out = _out_dir() / "hybrid" / "hdfc_hybrid.pdf"
+    out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
     doc.close()
 
@@ -81,6 +84,7 @@ def _broken_pdf() -> None:
     # Create a page with no text (empty page)
     doc.new_page(width=595, height=842)
     out = _out_dir() / "broken" / "empty.pdf"
+    out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
     doc.close()
 
