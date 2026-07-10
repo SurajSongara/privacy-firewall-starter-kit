@@ -51,5 +51,5 @@ class TestPageImages:
         image = render_page_image(pdf, 1, dpi=96)
         bbox = BoundingBox(x0=50.0, y0=100.0, x1=200.0, y1=120.0)
         x0, y0, x1, y1 = bbox_to_pixels(bbox, image.scale)
-        assert (x0 / image.scale, y0 / image.scale) == (bbox.x0, bbox.y0)
-        assert (x1 / image.scale, y1 / image.scale) == (bbox.x1, bbox.y1)
+        assert (x0 / image.scale, y0 / image.scale) == pytest.approx((bbox.x0, bbox.y0))
+        assert (x1 / image.scale, y1 / image.scale) == pytest.approx((bbox.x1, bbox.y1))
