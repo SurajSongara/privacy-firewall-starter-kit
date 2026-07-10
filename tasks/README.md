@@ -47,17 +47,25 @@ Principles: Precision before UI → Policy decides, user overrides → ReviewPla
 | # | Task | Status |
 |---|------|--------|
 | P001 | Detection Evidence — `detection_id` + `reasons` on Detection | ✅ Complete |
-| P002 | Context Scoring — label-proximity confidence adjustment | ⏳ Pending |
-| P003 | FP Fixes — Aadhaar Verhoeff, phone prefix, email TLD | ⏳ Pending |
-| P004 | Precision Benchmark — FP tracking + regression baseline | ⏳ Pending |
-| P005 | Policy Profiles — YAML: redact/keep/ask per type + bands | ⏳ Pending |
-| P006 | Decision Engine — (Fusion, Policy) → ReviewPlan JSON | ⏳ Pending |
-| P007 | Plan CLI — `--plan`, `--interactive`, `--yes` | ⏳ Pending |
-| P008 | Page Image Renderer — PNG + bbox transform for UI | ⏳ Pending |
-| P009 | Review Web UI — local, offline, `privacy-firewall review` | ⏳ Pending |
-| P010 | Feedback Memory — opt-in allowlists from review decisions | ⏳ Pending |
+| P002 | Context Scoring — label-proximity confidence adjustment | ✅ Complete |
+| P003 | FP Fixes — Aadhaar first-digit rule, email TLD allowlist | ✅ Complete |
+| P004 | Precision Benchmark — FP tracking + regression baseline | ✅ Complete |
+| P005 | Policy Profiles — YAML: redact/keep/ask per type + bands | ✅ Complete |
+| P006 | Decision Engine — (Fusion, Policy) → ReviewPlan JSON | ✅ Complete |
+| P007 | Plan CLI — `--plan`, `--interactive`, `--yes` | ✅ Complete |
+| P008 | Page Image Renderer — PNG + bbox transform for UI | ✅ Complete |
+| P009 | Review Web UI — local, offline, `privacy-firewall review` | ✅ Complete |
+| P010 | Feedback Memory — opt-in allowlists from review decisions | ⏸ Deferred |
 
-Order matters: P001–P004 first (a review UI over noisy detections is unusable), then P005–P007 (workflow usable from the terminal), then P008–P009 (UI), P010 last.
+Delivered:
+- Context scoring (label proximity promotes/demotes; drops below 0.3)
+- Precision baseline: 100% precision+recall on 6/7 types; PHONE 75% precision (2 known UTR/Ref-ID traps land in the ask band)
+- Policy presets `share-with-ai` / `kyc` / `minimal` + custom YAML/JSON
+- ReviewPlan JSON with source hash verification — the engine/CLI/UI contract and audit record
+- `detect --plan/--policy`, `redact --plan --interactive|--yes`
+- `privacy-firewall review file.pdf` — offline web UI (optional extra `[ui]`)
+
+P010 (feedback memory) stays deferred until the review UI has real usage, per its spec.
 
 ## Workflow
 
