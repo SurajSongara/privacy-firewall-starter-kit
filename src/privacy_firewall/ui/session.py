@@ -26,7 +26,7 @@ from privacy_firewall.engine.decision import (
     file_sha256,
 )
 from privacy_firewall.engine.fusion import FusionEngine
-from privacy_firewall.engine.ocr_pipeline import get_merged_document
+from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
 from privacy_firewall.engine.redaction import RedactionPlanner, RedactionType
 from privacy_firewall.policy.models import Policy
 from privacy_firewall.renderer.page_images import DEFAULT_DPI, render_page_image
@@ -98,6 +98,7 @@ class ReviewSession:
         return {
             "source": str(self.pdf_path),
             "policy": self.policy.name,
+            "pipeline": get_pipeline_summary(self.source),
             "counts": self.plan.counts(),
             "pages": [
                 {"page_number": p.page_number, "width": p.width, "height": p.height}

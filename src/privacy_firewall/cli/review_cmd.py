@@ -30,12 +30,15 @@ def review_cmd(
     ] = False,
     ocr: Annotated[
         bool,
-        typer.Option("--ocr", help="Run OCR and merge with native text."),
+        typer.Option("--ocr", help="Force OCR and merge with native text."),
     ] = False,
     auto: Annotated[
         bool,
-        typer.Option("--auto", help="Auto-detect pipeline (native/OCR/hybrid)."),
-    ] = False,
+        typer.Option(
+            "--auto/--no-auto",
+            help="Let diagnostics pick the pipeline (default: on, so scanned PDFs get OCR).",
+        ),
+    ] = True,
     ocr_engine: Annotated[
         str | None,
         typer.Option("--ocr-engine", help="OCR engine to use."),
@@ -60,6 +63,6 @@ def review_cmd(
         port=port,
         open_browser=not no_browser,
         force_ocr=ocr,
-        auto=auto,
+        auto=auto and not ocr,
         ocr_provider=ocr_engine,
     )

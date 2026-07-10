@@ -57,20 +57,48 @@ def get_merged_document(
 
 
 def _run_ocr(pdf_path: Path, provider: str | None = None) -> Document:
-    """Run the chosen OCR adapter on a PDF file.
+    """Run an OCR adapter on a PDF file.
+
+    When no provider is named, engines are tried in registry order
+    (default first). An adapter can import fine but still fail at
+    runtime — e.g. Tesseract installed without its tessdata — so
+    failures fall through to the next engine instead of aborting.
 
     Args:
         pdf_path: Path to the PDF.
-        provider: OCR adapter name, or ``None`` for registry default.
+        provider: OCR adapter name, or ``None`` to try all registered
+            engines until one succeeds.
 
     Returns:
         A ``Document`` with OCR-extracted blocks.
 
     Raises:
-        ImportError: If the required OCR package is not installed.
+        RuntimeError: If every registered engine failed.
+        ValueError: If a named provider is unknown, or none are registered.
     """
-    adapter = _get_adapter(provider)
-    return adapter.process(pdf_path)
+    if provider is not None:
+        return _get_adapter(provider).process(pdf_path)
+
+    from privacy_firewall.ocr import get_registry
+
+    registry = get_registry()
+    names = registry.names
+    if not names:
+        return _get_adapter(None).process(pdf_path)  # raises the install hint
+
+    if registry.default_name in names:
+        names.remove(registry.default_name)
+        names.insert(0, registry.default_name)
+
+    errors: list[str] = []
+    for name in names:
+        try:
+            return _get_adapter(name).process(pdf_path)
+        except Exception as exc:  # noqa: BLE001 - each engine fails its own way
+            errors.append(f"{name}: {exc}")
+
+    msg = "All OCR engines failed:\n" + "\n".join(f"  - {e}" for e in errors)
+    raise RuntimeError(msg)
 
 
 def _get_adapter(name: str | None = None) -> OCRProvider:

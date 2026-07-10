@@ -32,8 +32,13 @@ PAGE_HTML = """<!doctype html>
     display: none; padding: 10px 16px; background: #dcfce7; color: #14532d;
     border-bottom: 1px solid #86efac; font-weight: 600; word-break: break-all;
   }
-  main { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+  main { display: flex; gap: 16px; padding: 16px; align-items: flex-start; justify-content: center; }
   #sidebar { width: 360px; flex-shrink: 0; position: sticky; top: 64px; max-height: calc(100vh - 90px); overflow-y: auto; }
+  #sidebar.empty { display: none; }
+  .empty-note {
+    background: #fffbeb; border: 1px solid #fcd34d; color: #78350f;
+    border-radius: 8px; padding: 14px 18px; margin: 0 auto 16px; max-width: 900px;
+  }
   .group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
   .group h2 {
     display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 0;
@@ -52,7 +57,7 @@ PAGE_HTML = """<!doctype html>
   .entry .page { color: #a8a29e; font-size: 11px; margin-left: auto; white-space: nowrap; }
   .entry .why { color: #78716c; font-size: 11px; margin-top: 3px; }
   .entry select { font-size: 12px; padding: 1px 4px; border-radius: 4px; border: 1px solid var(--line); }
-  #pages { flex: 1; min-width: 0; }
+  #pages { flex: 1; min-width: 0; max-width: 940px; }
   .page-wrap { position: relative; margin: 0 auto 20px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
   .page-wrap img { display: block; width: 100%; height: auto; }
   .overlay { position: absolute; border: 2px solid; border-radius: 2px; cursor: pointer; }
@@ -103,9 +108,26 @@ function render() {
   for (const k of ["redact", "ask", "keep"]) {
     document.getElementById("count-" + k).textContent = counts[k] + " " + k;
   }
-  document.getElementById("meta").textContent = PLAN.source + " · policy: " + PLAN.policy;
+  document.getElementById("meta").textContent =
+    PLAN.source + " · policy: " + PLAN.policy + " · " + PLAN.pipeline;
+  document.getElementById("sidebar").classList.toggle("empty", PLAN.entries.length === 0);
+  document.getElementById("apply").disabled = PLAN.entries.length === 0;
+  renderEmptyNote();
   renderSidebar();
   renderOverlays();
+}
+
+function renderEmptyNote() {
+  const existing = document.querySelector(".empty-note");
+  if (existing) existing.remove();
+  if (PLAN.entries.length > 0) return;
+  const note = document.createElement("div");
+  note.className = "empty-note";
+  note.innerHTML = "<strong>No PII detected.</strong> Pipeline used: " + esc(PLAN.pipeline) +
+    ". If this document is scanned and looks like it should have detections, restart with " +
+    "<code>--ocr</code> (or <code>--ocr-engine rapidocr</code>).";
+  const pages = document.getElementById("pages");
+  pages.insertBefore(note, pages.firstChild);
 }
 
 function renderSidebar() {
