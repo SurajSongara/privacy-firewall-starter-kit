@@ -62,7 +62,16 @@ class PaddleOCRAdapter(OCRProvider):
                 "available on all Python versions.)"
             )
             raise ImportError(msg) from exc
-        self._ocr = PaddleOCR(use_angle_cls=self._use_angle_cls, lang=self._lang)
+        try:
+            self._ocr = PaddleOCR(use_angle_cls=self._use_angle_cls, lang=self._lang)
+        except Exception as exc:
+            msg = (
+                "paddleocr is not installed or its paddlepaddle backend is "
+                "unavailable. Install with:\n"
+                "  pip install paddleocr\n"
+                f"Underlying error: {exc}"
+            )
+            raise ImportError(msg) from exc
         return self._ocr
 
     def process(self, path: str | Path) -> Document:
