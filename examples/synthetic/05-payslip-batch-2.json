@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "NNNPB4388M",
+      "text": "RRRPM4697C",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "693585311795",
+      "text": "821020458197",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "pooja_gupta242@outlook.com",
+      "text": "priyapatel744@outlook.com",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "6182300696",
+      "text": "9483589812",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "395085481530829",
+      "text": "31380580178",
       "page_number": 1,
       "label": "Account No:"
     },
     {
       "detection_type": "IFSC",
-      "text": "UTIB074TAI6",
+      "text": "SBIN02A55KV",
       "page_number": 1,
       "label": "IFSC:"
     },
     {
       "detection_type": "UPI",
-      "text": "pooja.gupta66@okicicibank",
+      "text": "priya.patel61@okicicibank",
       "page_number": 1,
       "label": "UPI:"
     }

@@ -83,7 +83,8 @@ def _rand_aadhaar() -> str:
     ]
     INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
     
-    base = "".join(random.choices(string.digits, k=11))
+    # UIDAI never issues Aadhaar numbers starting with 0 or 1
+    base = random.choice("23456789") + "".join(random.choices(string.digits, k=10))
     c = 0
     for i in range(len(base) - 1, -1, -1):
         digit = int(base[i])
@@ -469,18 +470,25 @@ class TrickyEdgeCaseGenerator(SyntheticDocumentGenerator):
             ("Branch Code: 30524@sbi.coin", "FALSE_EMAIL"),
             ("System ID: admin@internal.ledger", "FALSE_EMAIL"),
 
-            # Real PII mixed in
+            # Real PII mixed in (226251716424 is Verhoeff-valid, starts 2-9)
             ("Account Holder: Rajesh Kumar Sharma", "REAL_NAME"),
             ("PAN: ABCPA5678J", "REAL_PAN"),
             ("Phone: +91-9876543210", "REAL_PHONE"),
             ("Email: rajesh.sharma@gmail.com", "REAL_EMAIL"),
-            ("Aadhaar: 234567890123", "REAL_AADHAAR"),
+            ("Aadhaar: 226251716424", "REAL_AADHAAR"),
             ("UPI: rajesh@okhdfcbank", "REAL_UPI"),
         ]
 
         for item, item_type in tricky_items:
             page.insert_text(fitz.Point(50, y), item, fontsize=10, fontname="helv")
             y += 18
+
+        # Ground truth for the deterministic real PII on page 1
+        self._add_pii("PAN", "ABCPA5678J", 1, "PAN:")
+        self._add_pii("PHONE", "+91-9876543210", 1, "Phone:")
+        self._add_pii("EMAIL", "rajesh.sharma@gmail.com", 1, "Email:")
+        self._add_pii("AADHAAR", "226251716424", 1, "Aadhaar:")
+        self._add_pii("UPI", "rajesh@okhdfcbank", 1, "UPI:")
 
         # Page 2: Multi-column layout with PII in headers/footers
         page2 = doc.new_page(width=595, height=842)
@@ -515,6 +523,14 @@ class TrickyEdgeCaseGenerator(SyntheticDocumentGenerator):
             page2.insert_text(fitz.Point(50, y), line, fontsize=9, fontname="cour")
             y += 15
 
+        # Ground truth for the deterministic real PII on page 2
+        self._add_pii("PAN", "XYZAB1234C", 2, "PAN:")
+        self._add_pii("EMAIL", "support@bank.co.in", 2, "Contact:")
+        self._add_pii("PAN", "ABCPA5678J", 2, "Salary Credit")
+        self._add_pii("UPI", "priya@ybl", 2, "UPI:")
+        self._add_pii("PHONE", "9876543210", 2, "Mobile:")
+        self._add_pii("UPI", "rajesh@okhdfcbank", 2, "UPI:")
+
         # Page 3: OCR stress test - rotated text, small text, overlapping
         page3 = doc.new_page(width=595, height=842)
         self._draw_header(page3, "OCR STRESS TEST")
@@ -522,13 +538,21 @@ class TrickyEdgeCaseGenerator(SyntheticDocumentGenerator):
         y = 120
         page3.insert_text(fitz.Point(50, y), "Small text: PAN: MNPQR5678S", fontsize=7, fontname="helv")
         y += 20
-        page3.insert_text(fitz.Point(50, y), "Tight spacing: Aadhaar:456789012345 Email:user@test.com", fontsize=9, fontname="helv")
+        page3.insert_text(fitz.Point(50, y), "Tight spacing: Aadhaar:555566667771 Email:user@test.com", fontsize=9, fontname="helv")
         y += 20
-        page3.insert_text(fitz.Point(50, y), "Mixed case: pAn: AbCdE1234F  aAdHaAr: 112233445566", fontsize=9, fontname="helv")
+        page3.insert_text(fitz.Point(50, y), "Mixed case: pAn: AbCdE1234F  aAdHaAr: 234512341239", fontsize=9, fontname="helv")
         y += 20
         page3.insert_text(fitz.Point(50, y), "With symbols: Phone: (91) 98765-43210  UPI: user@paytm", fontsize=9, fontname="helv")
         y += 20
         page3.insert_text(fitz.Point(50, y), "Dotted: A.C. No. 1234.5678.9012  IFSC: SBIN.0001.234", fontsize=9, fontname="helv")
+
+        # Ground truth for the deterministic real PII on page 3
+        self._add_pii("PAN", "MNPQR5678S", 3, "Small text:")
+        self._add_pii("AADHAAR", "555566667771", 3, "Tight spacing")
+        self._add_pii("EMAIL", "user@test.com", 3, "Tight spacing")
+        self._add_pii("AADHAAR", "234512341239", 3, "Mixed case")
+        self._add_pii("PHONE", "98765-43210", 3, "With symbols")
+        self._add_pii("UPI", "user@paytm", 3, "With symbols")
 
         # Save
         output_path.parent.mkdir(parents=True, exist_ok=True)

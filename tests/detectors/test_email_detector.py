@@ -126,3 +126,20 @@ class TestEmailDetector:
         doc = Document(pages=[page])
         result = self.detector.scan(doc)
         assert result[0].bbox == bbox
+
+    def test_unknown_tld_rejected(self) -> None:
+        # OCR artifact from a mangled "sbi.co.in" — "coin" is not a real TLD.
+        doc = Document(pages=[_page("Branch Code: 30524@sbi.coin")])
+        result = self.detector.scan(doc)
+        assert result == []
+
+    def test_internal_system_id_rejected(self) -> None:
+        doc = Document(pages=[_page("System ID: admin@internal.ledger")])
+        result = self.detector.scan(doc)
+        assert result == []
+
+    def test_country_tld_accepted(self) -> None:
+        doc = Document(pages=[_page("Contact: support@bank.co.in")])
+        result = self.detector.scan(doc)
+        assert len(result) == 1
+        assert result[0].text == "support@bank.co.in"

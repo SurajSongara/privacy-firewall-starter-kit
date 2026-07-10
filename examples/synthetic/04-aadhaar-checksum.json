@@ -4,31 +4,31 @@
   "expectations": [
     {
       "detection_type": "AADHAAR",
-      "text": "532878938452",
+      "text": "820670566969",
       "page_number": 1,
       "label": "Valid Aadhaar"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "653269042538",
+      "text": "342979912749",
       "page_number": 1,
       "label": "Valid Aadhaar"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "542783896217",
+      "text": "765735718356",
       "page_number": 1,
       "label": "Valid Aadhaar"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "233093718691",
+      "text": "385307797092",
       "page_number": 1,
       "label": "Valid Aadhaar"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "775530074279",
+      "text": "457734922867",
       "page_number": 1,
       "label": "Valid Aadhaar"
     }

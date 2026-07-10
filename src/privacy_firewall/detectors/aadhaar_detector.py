@@ -148,6 +148,9 @@ class AadhaarDetector(BaseDetector):
             return False
         if not aadhaar.isdigit():
             return False
+        # UIDAI never issues Aadhaar numbers starting with 0 or 1
+        if aadhaar[0] in "01":
+            return False
         # Validate Verhoeff checksum
         return AadhaarDetector._verhoeff_check(aadhaar)
 

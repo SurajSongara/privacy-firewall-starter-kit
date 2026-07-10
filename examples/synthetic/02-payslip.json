@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "KKKJC7663P",
+      "text": "GGGFJ0710X",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "073211897107",
+      "text": "519418444181",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "sneha_agarwal927@hotmail.com",
+      "text": "kavithanair156@yahoo.com",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "6451820732",
+      "text": "7963732984",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "949595549526002",
+      "text": "37978601637",
       "page_number": 1,
       "label": "Account No:"
     },
     {
       "detection_type": "IFSC",
-      "text": "UTIB00PIF9E",
+      "text": "SBIN0OWWDJQ",
       "page_number": 1,
       "label": "IFSC:"
     },
     {
       "detection_type": "UPI",
-      "text": "sneha.agarwal51@okicicibank",
+      "text": "kavitha.nair34@ibl",
       "page_number": 1,
       "label": "UPI:"
     }

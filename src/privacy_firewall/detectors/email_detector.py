@@ -11,6 +11,19 @@ from privacy_firewall.models.geometry import Span
 EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 """Regex matching standard email addresses per RFC 5322 simplified."""
 
+KNOWN_TLDS: frozenset[str] = frozenset(
+    {
+        # Generic
+        "com", "net", "org", "edu", "gov", "mil", "int", "info", "biz",
+        "name", "pro", "mobi", "email", "cloud", "online", "site", "store",
+        "tech", "app", "dev", "io", "ai", "me", "co", "xyz", "bank",
+        # Country codes common in Indian documents
+        "in", "us", "uk", "au", "ca", "de", "fr", "jp", "cn", "ru", "br",
+        "it", "nl", "es", "se", "ch", "sg", "hk", "ae", "nz", "za",
+    }
+)
+"""TLD allowlist — rejects OCR artifacts like ``30524@sbi.coin``."""
+
 
 class EmailDetector(BaseDetector):
     """Detector that identifies email addresses in document text."""
@@ -87,9 +100,10 @@ class EmailDetector(BaseDetector):
             return False
         if not domain or ".." in domain:
             return False
-        # Domain must end with a proper TLD (at least 2 chars)
-        tld = domain.split(".")[-1]
-        if len(tld) < 2:
+        # Domain must end with a recognised TLD (rejects OCR artifacts
+        # like "sbi.coin" or "internal.ledger")
+        tld = domain.split(".")[-1].lower()
+        if tld not in KNOWN_TLDS:
             return False
         # Domain should not contain invalid characters
         if not all(c.isalnum() or c in "-." for c in domain):

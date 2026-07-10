@@ -5,43 +5,43 @@
     "expectations": [
       {
         "detection_type": "PAN",
-        "text": "BBBLU7466K",
+        "text": "UUUAZ4863E",
         "page_number": 1,
         "label": "PAN:"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "449063523448",
+        "text": "999259990284",
         "page_number": 1,
         "label": "Aadhaar:"
       },
       {
         "detection_type": "EMAIL",
-        "text": "amit.singh969@hotmail.com",
+        "text": "pooja.gupta446@gmail.com",
         "page_number": 1,
         "label": "Email:"
       },
       {
         "detection_type": "PHONE",
-        "text": "9295240159",
+        "text": "6255024884",
         "page_number": 1,
         "label": "Phone:"
       },
       {
         "detection_type": "ACCOUNT",
-        "text": "11845478284",
+        "text": "42213259596",
         "page_number": 2,
         "label": "Bank Account:"
       },
       {
         "detection_type": "IFSC",
-        "text": "SBIN0RDOHAY",
+        "text": "SBIN0KTNTDH",
         "page_number": 2,
         "label": "IFSC Code:"
       },
       {
         "detection_type": "UPI",
-        "text": "amit.singh70@paytm",
+        "text": "pooja.gupta88@paytm",
         "page_number": 2,
         "label": "UPI ID:"
       }
@@ -53,43 +53,43 @@
     "expectations": [
       {
         "detection_type": "PAN",
-        "text": "KKKJC7663P",
+        "text": "GGGFJ0710X",
         "page_number": 1,
         "label": "PAN:"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "073211897107",
+        "text": "519418444181",
         "page_number": 1,
         "label": "Aadhaar:"
       },
       {
         "detection_type": "EMAIL",
-        "text": "sneha_agarwal927@hotmail.com",
+        "text": "kavithanair156@yahoo.com",
         "page_number": 1,
         "label": "Email:"
       },
       {
         "detection_type": "PHONE",
-        "text": "6451820732",
+        "text": "7963732984",
         "page_number": 1,
         "label": "Phone:"
       },
       {
         "detection_type": "ACCOUNT",
-        "text": "949595549526002",
+        "text": "37978601637",
         "page_number": 1,
         "label": "Account No:"
       },
       {
         "detection_type": "IFSC",
-        "text": "UTIB00PIF9E",
+        "text": "SBIN0OWWDJQ",
         "page_number": 1,
         "label": "IFSC:"
       },
       {
         "detection_type": "UPI",
-        "text": "sneha.agarwal51@okicicibank",
+        "text": "kavitha.nair34@ibl",
         "page_number": 1,
         "label": "UPI:"
       }
@@ -98,7 +98,98 @@
   "03-tricky-edge-cases": {
     "document": "synthetic/03-tricky-edge-cases.pdf",
     "description": "Synthetic 03 Tricky Edge Cases",
-    "expectations": []
+    "expectations": [
+      {
+        "detection_type": "PAN",
+        "text": "ABCPA5678J",
+        "page_number": 1,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "+91-9876543210",
+        "page_number": 1,
+        "label": "Phone:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "rajesh.sharma@gmail.com",
+        "page_number": 1,
+        "label": "Email:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "226251716424",
+        "page_number": 1,
+        "label": "Aadhaar:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "rajesh@okhdfcbank",
+        "page_number": 1,
+        "label": "UPI:"
+      },
+      {
+        "detection_type": "PAN",
+        "text": "XYZAB1234C",
+        "page_number": 2,
+        "label": "PAN:"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "support@bank.co.in",
+        "page_number": 2,
+        "label": "Contact:"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "priya@ybl",
+        "page_number": 2,
+        "label": "UPI:"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "9876543210",
+        "page_number": 2,
+        "label": "Mobile:"
+      },
+      {
+        "detection_type": "PAN",
+        "text": "MNPQR5678S",
+        "page_number": 3,
+        "label": "Small text:"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "555566667771",
+        "page_number": 3,
+        "label": "Tight spacing"
+      },
+      {
+        "detection_type": "EMAIL",
+        "text": "user@test.com",
+        "page_number": 3,
+        "label": "Tight spacing"
+      },
+      {
+        "detection_type": "AADHAAR",
+        "text": "234512341239",
+        "page_number": 3,
+        "label": "Mixed case"
+      },
+      {
+        "detection_type": "PHONE",
+        "text": "98765-43210",
+        "page_number": 3,
+        "label": "With symbols"
+      },
+      {
+        "detection_type": "UPI",
+        "text": "user@paytm",
+        "page_number": 3,
+        "label": "With symbols"
+      }
+    ]
   },
   "04-aadhaar-checksum": {
     "document": "synthetic/04-aadhaar-checksum.pdf",
@@ -106,31 +197,31 @@
     "expectations": [
       {
         "detection_type": "AADHAAR",
-        "text": "532878938452",
+        "text": "820670566969",
         "page_number": 1,
         "label": "Valid Aadhaar"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "653269042538",
+        "text": "342979912749",
         "page_number": 1,
         "label": "Valid Aadhaar"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "542783896217",
+        "text": "765735718356",
         "page_number": 1,
         "label": "Valid Aadhaar"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "233093718691",
+        "text": "385307797092",
         "page_number": 1,
         "label": "Valid Aadhaar"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "775530074279",
+        "text": "457734922867",
         "page_number": 1,
         "label": "Valid Aadhaar"
       }
@@ -142,43 +233,43 @@
     "expectations": [
       {
         "detection_type": "PAN",
-        "text": "NNNPB4388M",
+        "text": "RRRPM4697C",
         "page_number": 1,
         "label": "PAN:"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "693585311795",
+        "text": "821020458197",
         "page_number": 1,
         "label": "Aadhaar:"
       },
       {
         "detection_type": "EMAIL",
-        "text": "pooja_gupta242@outlook.com",
+        "text": "priyapatel744@outlook.com",
         "page_number": 1,
         "label": "Email:"
       },
       {
         "detection_type": "PHONE",
-        "text": "6182300696",
+        "text": "9483589812",
         "page_number": 1,
         "label": "Phone:"
       },
       {
         "detection_type": "ACCOUNT",
-        "text": "395085481530829",
+        "text": "31380580178",
         "page_number": 1,
         "label": "Account No:"
       },
       {
         "detection_type": "IFSC",
-        "text": "UTIB074TAI6",
+        "text": "SBIN02A55KV",
         "page_number": 1,
         "label": "IFSC:"
       },
       {
         "detection_type": "UPI",
-        "text": "pooja.gupta66@okicicibank",
+        "text": "priya.patel61@okicicibank",
         "page_number": 1,
         "label": "UPI:"
       }
@@ -190,43 +281,43 @@
     "expectations": [
       {
         "detection_type": "PAN",
-        "text": "UUUPT6077R",
+        "text": "SSSCR5136U",
         "page_number": 1,
         "label": "PAN:"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "093620424643",
+        "text": "552217366623",
         "page_number": 1,
         "label": "Aadhaar:"
       },
       {
         "detection_type": "EMAIL",
-        "text": "priya_patel350@hotmail.com",
+        "text": "ananya.deshmukh827@yahoo.com",
         "page_number": 1,
         "label": "Email:"
       },
       {
         "detection_type": "PHONE",
-        "text": "8288256550",
+        "text": "8097999031",
         "page_number": 1,
         "label": "Phone:"
       },
       {
         "detection_type": "ACCOUNT",
-        "text": "92617360594921",
+        "text": "39059680236",
         "page_number": 1,
         "label": "Account No:"
       },
       {
         "detection_type": "IFSC",
-        "text": "HDFC0PGBDA7",
+        "text": "SBIN08FLDSP",
         "page_number": 1,
         "label": "IFSC:"
       },
       {
         "detection_type": "UPI",
-        "text": "priya.patel83@ybl",
+        "text": "ananya.deshmukh25@okicicibank",
         "page_number": 1,
         "label": "UPI:"
       }
@@ -238,43 +329,43 @@
     "expectations": [
       {
         "detection_type": "PAN",
-        "text": "VVVTT4474I",
+        "text": "VVVJI5702P",
         "page_number": 1,
         "label": "PAN:"
       },
       {
         "detection_type": "AADHAAR",
-        "text": "332861831869",
+        "text": "537523092954",
         "page_number": 1,
         "label": "Aadhaar:"
       },
       {
         "detection_type": "EMAIL",
-        "text": "rohit.verma216@gmail.com",
+        "text": "priya.patel636@company.co.in",
         "page_number": 1,
         "label": "Email:"
       },
       {
         "detection_type": "PHONE",
-        "text": "7872419273",
+        "text": "9772054755",
         "page_number": 1,
         "label": "Phone:"
       },
       {
         "detection_type": "ACCOUNT",
-        "text": "08827778813",
+        "text": "09570953602",
         "page_number": 2,
         "label": "Bank Account:"
       },
       {
         "detection_type": "IFSC",
-        "text": "SBIN0M0P44H",
+        "text": "SBIN08R0QVA",
         "page_number": 2,
         "label": "IFSC Code:"
       },
       {
         "detection_type": "UPI",
-        "text": "rohit.verma47@ibl",
+        "text": "priya.patel59@okhdfcbank",
         "page_number": 2,
         "label": "UPI ID:"
       }

@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "VVVTT4474I",
+      "text": "VVVJI5702P",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "332861831869",
+      "text": "537523092954",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "rohit.verma216@gmail.com",
+      "text": "priya.patel636@company.co.in",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "7872419273",
+      "text": "9772054755",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "08827778813",
+      "text": "09570953602",
       "page_number": 2,
       "label": "Bank Account:"
     },
     {
       "detection_type": "IFSC",
-      "text": "SBIN0M0P44H",
+      "text": "SBIN08R0QVA",
       "page_number": 2,
       "label": "IFSC Code:"
     },
     {
       "detection_type": "UPI",
-      "text": "rohit.verma47@ibl",
+      "text": "priya.patel59@okhdfcbank",
       "page_number": 2,
       "label": "UPI ID:"
     }

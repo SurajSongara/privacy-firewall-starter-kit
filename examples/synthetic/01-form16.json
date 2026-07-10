@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "BBBLU7466K",
+      "text": "UUUAZ4863E",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "449063523448",
+      "text": "999259990284",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "amit.singh969@hotmail.com",
+      "text": "pooja.gupta446@gmail.com",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "9295240159",
+      "text": "6255024884",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "11845478284",
+      "text": "42213259596",
       "page_number": 2,
       "label": "Bank Account:"
     },
     {
       "detection_type": "IFSC",
-      "text": "SBIN0RDOHAY",
+      "text": "SBIN0KTNTDH",
       "page_number": 2,
       "label": "IFSC Code:"
     },
     {
       "detection_type": "UPI",
-      "text": "amit.singh70@paytm",
+      "text": "pooja.gupta88@paytm",
       "page_number": 2,
       "label": "UPI ID:"
     }
