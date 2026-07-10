@@ -58,6 +58,12 @@ ignore_missing_imports = true
 disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
+# The review UI (optional `ui` extra) uses FastAPI route decorators that are
+# not annotated for mypy; relax the untyped-decorator check for that package.
+[[tool.mypy.overrides]]
+module = "privacy_firewall.ui.*"
+disallow_untyped_decorators = false
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
