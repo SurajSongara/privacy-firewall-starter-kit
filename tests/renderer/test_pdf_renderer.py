@@ -131,6 +131,49 @@ class TestPDFRenderer:
             page_text = doc[0].get_text()
         assert "ABCDE1234F" not in page_text
 
+    def test_replace_draws_stars_instead_of_black_bar(self) -> None:
+        """REPLACE redaction should render the replacement text (stars)."""
+        data = _make_simple_pdf()
+        det = _detection()
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="*****",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as doc:
+            page_text = doc[0].get_text()
+        assert "ABCDE1234F" not in page_text
+        assert "*****" in page_text
+
+    def test_replace_without_text_falls_back_to_stars(self) -> None:
+        """A REPLACE redaction with no replacement_text still draws stars."""
+        data = _make_simple_pdf()
+        det = _detection()
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text=None,
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as doc:
+            page_text = doc[0].get_text()
+        assert "*****" in page_text
+
     def test_highlight_preserves_text_content(self) -> None:
         """HIGHLIGHT should be visual-only and not remove text."""
         data = _make_simple_pdf()
@@ -171,7 +214,8 @@ class TestPDFRenderer:
             page = doc[0]
             paths = page.get_drawings()
             yellow_fills = [
-                p for p in paths
+                p
+                for p in paths
                 if p.get("fill") is not None
                 and p["fill"][0] == 1.0
                 and p["fill"][1] == 1.0

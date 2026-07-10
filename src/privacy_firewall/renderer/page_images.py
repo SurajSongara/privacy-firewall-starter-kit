@@ -72,6 +72,39 @@ def render_page_image(pdf_path: Path, page_number: int, dpi: int = DEFAULT_DPI) 
         )
 
 
+def render_page_image_bytes(data: bytes, page_number: int, dpi: int = DEFAULT_DPI) -> PageImage:
+    """Rasterise one page of an in-memory PDF to a PNG.
+
+    Bytes twin of :func:`render_page_image` — used by the review UI to
+    preview redacted output without writing a file.
+
+    Args:
+        data: Raw PDF bytes.
+        page_number: 1-based page number.
+        dpi: Render resolution (PDF native resolution is 72 dpi).
+
+    Returns:
+        The rendered PageImage.
+
+    Raises:
+        ValueError: If *page_number* is out of range.
+    """
+    scale = dpi / 72.0
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        if not 1 <= page_number <= doc.page_count:
+            msg = f"page {page_number} out of range (1..{doc.page_count})"
+            raise ValueError(msg)
+        page = doc[page_number - 1]
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
+        return PageImage(
+            page_number=page_number,
+            width=pixmap.width,
+            height=pixmap.height,
+            scale=scale,
+            png_bytes=pixmap.tobytes("png"),
+        )
+
+
 def bbox_to_pixels(bbox: BoundingBox, scale: float) -> tuple[float, float, float, float]:
     """Map a bbox from PDF points to rendered-image pixels.
 

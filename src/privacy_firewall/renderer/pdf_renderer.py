@@ -21,7 +21,16 @@ class PDFRenderer:
     """
 
     BLACK_BAR_COLOR: tuple[float, float, float] = (0.0, 0.0, 0.0)
-    """RGB colour used for ``BLACK_BAR`` and ``REPLACE`` redactions."""
+    """RGB colour used for ``BLACK_BAR`` redactions."""
+
+    REPLACE_FILL: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    """Background colour behind the replacement text for ``REPLACE``."""
+
+    REPLACE_TEXT_COLOR: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    """Colour of the replacement text for ``REPLACE`` redactions."""
+
+    DEFAULT_REPLACEMENT = "*****"
+    """Replacement drawn when a ``REPLACE`` redaction carries no text."""
 
     HIGHLIGHT_COLOR: tuple[float, float, float] = (1.0, 1.0, 0.0)
     """RGB colour used for ``HIGHLIGHT`` redactions."""
@@ -109,17 +118,29 @@ class PDFRenderer:
                     rects = search_results
                 else:
                     # Fall back to the detection bbox
-                    rects = [fitz.Rect(
-                        redaction.bbox.x0,
-                        redaction.bbox.y0,
-                        redaction.bbox.x1,
-                        redaction.bbox.y1,
-                    )]
+                    rects = [
+                        fitz.Rect(
+                            redaction.bbox.x0,
+                            redaction.bbox.y0,
+                            redaction.bbox.x1,
+                            redaction.bbox.y1,
+                        )
+                    ]
 
                 for rect in rects:
-                    if redaction.redaction_type in (RedactionType.REPLACE, RedactionType.BLACK_BAR):
-                        # Add text parameter to ensure the text is removed
-                        page.add_redact_annot(rect, text='', fill=PDFRenderer.BLACK_BAR_COLOR)
+                    if redaction.redaction_type == RedactionType.REPLACE:
+                        # Strip the text and draw the replacement (e.g. "*****")
+                        # on a white background instead of a black bar.
+                        page.add_redact_annot(
+                            rect,
+                            text=redaction.replacement_text or PDFRenderer.DEFAULT_REPLACEMENT,
+                            fill=PDFRenderer.REPLACE_FILL,
+                            text_color=PDFRenderer.REPLACE_TEXT_COLOR,
+                            align=fitz.TEXT_ALIGN_CENTER,
+                        )
+                        has_destructive = True
+                    elif redaction.redaction_type == RedactionType.BLACK_BAR:
+                        page.add_redact_annot(rect, text="", fill=PDFRenderer.BLACK_BAR_COLOR)
                         has_destructive = True
                     elif redaction.redaction_type == RedactionType.HIGHLIGHT:
                         page.draw_rect(

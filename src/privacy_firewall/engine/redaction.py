@@ -89,7 +89,7 @@ class RedactionPlanner:
     configurable default redaction type and replacement text.
     """
 
-    DEFAULT_REPLACEMENT = "[REDACTED]"
+    DEFAULT_REPLACEMENT = "*****"
 
     def plan(
         self,

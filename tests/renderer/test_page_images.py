@@ -8,6 +8,7 @@ from privacy_firewall.renderer.page_images import (
     bbox_to_pixels,
     page_count,
     render_page_image,
+    render_page_image_bytes,
 )
 
 
@@ -42,6 +43,16 @@ class TestPageImages:
             render_page_image(pdf, 3)
         with pytest.raises(ValueError, match="out of range"):
             render_page_image(pdf, 0)
+
+    def test_render_bytes_matches_file_render(self, pdf: Path) -> None:
+        from_file = render_page_image(pdf, 1, dpi=96)
+        from_bytes = render_page_image_bytes(pdf.read_bytes(), 1, dpi=96)
+        assert from_bytes.png_bytes == from_file.png_bytes
+        assert from_bytes.scale == from_file.scale
+
+    def test_render_bytes_page_out_of_range(self, pdf: Path) -> None:
+        with pytest.raises(ValueError, match="out of range"):
+            render_page_image_bytes(pdf.read_bytes(), 3)
 
     def test_bbox_transform(self) -> None:
         bbox = BoundingBox(x0=10.0, y0=20.0, x1=110.0, y1=40.0)
