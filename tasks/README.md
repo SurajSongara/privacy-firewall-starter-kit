@@ -38,6 +38,27 @@ Delivered:
 - `privacy-firewall doctor` CLI command
 - Regression benchmarks with synthetic PDFs + recall tests
 
+## Phase 3 — Precision & Review Pack (Planned)
+
+The core gap: detection and decision are conflated — every detection becomes a redaction, but what counts as PII depends on the document and the sharing context. Phase 3 separates them (Detect → Decide → Review → Redact), fixes the known false positives, and adds a local review UI with engine pre-selections.
+
+Principles: Precision before UI → Policy decides, user overrides → ReviewPlan JSON is the engine/UI contract → UI holds zero business logic
+
+| # | Task | Status |
+|---|------|--------|
+| P001 | Detection Evidence — `detection_id` + `reasons` on Detection | ⏳ Pending |
+| P002 | Context Scoring — label-proximity confidence adjustment | ⏳ Pending |
+| P003 | FP Fixes — Aadhaar Verhoeff, phone prefix, email TLD | ⏳ Pending |
+| P004 | Precision Benchmark — FP tracking + regression baseline | ⏳ Pending |
+| P005 | Policy Profiles — YAML: redact/keep/ask per type + bands | ⏳ Pending |
+| P006 | Decision Engine — (Fusion, Policy) → ReviewPlan JSON | ⏳ Pending |
+| P007 | Plan CLI — `--plan`, `--interactive`, `--yes` | ⏳ Pending |
+| P008 | Page Image Renderer — PNG + bbox transform for UI | ⏳ Pending |
+| P009 | Review Web UI — local, offline, `privacy-firewall review` | ⏳ Pending |
+| P010 | Feedback Memory — opt-in allowlists from review decisions | ⏳ Pending |
+
+Order matters: P001–P004 first (a review UI over noisy detections is unusable), then P005–P007 (workflow usable from the terminal), then P008–P009 (UI), P010 last.
+
 ## Workflow
 
 1. Read `.ai/START_HERE.md`
