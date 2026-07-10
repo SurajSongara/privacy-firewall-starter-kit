@@ -143,3 +143,17 @@ class TestEmailDetector:
         result = self.detector.scan(doc)
         assert len(result) == 1
         assert result[0].text == "support@bank.co.in"
+
+    def test_glued_next_token_trimmed(self) -> None:
+        # Fragmented PDF extraction glues the next label onto the email.
+        doc = Document(pages=[_page("pooja569@hotmail.comPhone: 9876543210")])
+        result = self.detector.scan(doc)
+        assert len(result) == 1
+        assert result[0].text == "pooja569@hotmail.com"
+
+    def test_lowercase_glued_residue_still_rejected(self) -> None:
+        # "coin" starts with the known TLD "co" but the residue "in" is
+        # lowercase — a genuine artifact, not a glued token.
+        doc = Document(pages=[_page("Branch: 30524@sbi.coin")])
+        result = self.detector.scan(doc)
+        assert result == []

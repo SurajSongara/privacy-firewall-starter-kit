@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "SSSCR5136U",
+      "text": "OOOGH1783L",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "552217366623",
+      "text": "248328402578",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "ananya.deshmukh827@yahoo.com",
+      "text": "vikramjoshi267@gmail.com",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "8097999031",
+      "text": "8224011447",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "39059680236",
+      "text": "989584899950929",
       "page_number": 1,
       "label": "Account No:"
     },
     {
       "detection_type": "IFSC",
-      "text": "SBIN08FLDSP",
+      "text": "UTIB0UMYG5C",
       "page_number": 1,
       "label": "IFSC:"
     },
     {
       "detection_type": "UPI",
-      "text": "ananya.deshmukh25@okicicibank",
+      "text": "vikram.joshi64@paytm",
       "page_number": 1,
       "label": "UPI:"
     }

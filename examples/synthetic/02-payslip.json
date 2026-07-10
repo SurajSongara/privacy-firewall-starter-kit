@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "GGGFJ0710X",
+      "text": "FFFAP3081D",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "519418444181",
+      "text": "471205398539",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "kavithanair156@yahoo.com",
+      "text": "rohitverma489@company.co.in",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "7963732984",
+      "text": "9210465917",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "37978601637",
+      "text": "26697927100567",
       "page_number": 1,
       "label": "Account No:"
     },
     {
       "detection_type": "IFSC",
-      "text": "SBIN0OWWDJQ",
+      "text": "HDFC04OOH2Y",
       "page_number": 1,
       "label": "IFSC:"
     },
     {
       "detection_type": "UPI",
-      "text": "kavitha.nair34@ibl",
+      "text": "rohit.verma81@okaxis",
       "page_number": 1,
       "label": "UPI:"
     }

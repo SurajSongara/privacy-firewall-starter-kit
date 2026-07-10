@@ -55,12 +55,13 @@ class EmailDetector(BaseDetector):
                     continue
 
                 for match in EMAIL_PATTERN.finditer(block.text):
-                    email = match.group()
+                    email = self._trim_glued_suffix(match.group())
                     if not self._validate_format(email):
                         continue
 
+                    end = match.start() + len(email)
                     match_bbox = (
-                        block.bbox_for_span(match.start(), match.end())
+                        block.bbox_for_span(match.start(), end)
                         if values_only
                         else block.bbox
                     )
@@ -70,7 +71,7 @@ class EmailDetector(BaseDetector):
                             detector_name=self.name,
                             detection_type="EMAIL",
                             text=email,
-                            span=Span(start=match.start(), end=match.end()),
+                            span=Span(start=match.start(), end=end),
                             bbox=match_bbox,
                             page_number=page.page_number,
                             confidence=0.9,
@@ -82,6 +83,31 @@ class EmailDetector(BaseDetector):
                     )
 
         return detections
+
+    @staticmethod
+    def _trim_glued_suffix(email: str) -> str:
+        """Trim a following token glued onto the TLD by PDF text extraction.
+
+        Fragmented extraction can concatenate the next label directly onto
+        an email (``user@hotmail.comPhone``). If the over-matched TLD starts
+        with a known TLD and the residue begins with an uppercase letter
+        (a new token), trim to the known TLD. Lowercase residues are left
+        alone so genuine artifacts like ``sbi.coin`` stay rejected.
+
+        Args:
+            email: The regex-matched candidate email.
+
+        Returns:
+            The email trimmed to a known TLD boundary, or unchanged.
+        """
+        _, _, domain = email.partition("@")
+        tld = domain.split(".")[-1]
+        if tld.lower() in KNOWN_TLDS:
+            return email
+        for known in sorted(KNOWN_TLDS, key=len, reverse=True):
+            if tld.lower().startswith(known) and tld[len(known) :][:1].isupper():
+                return email[: len(email) - (len(tld) - len(known))]
+        return email
 
     @staticmethod
     def _validate_format(email: str) -> bool:

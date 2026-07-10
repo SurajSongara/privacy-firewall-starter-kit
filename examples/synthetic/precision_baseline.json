@@ -1,0 +1,30 @@
+{
+  "AADHAAR": {
+    "precision": 1.0,
+    "recall": 1.0
+  },
+  "ACCOUNT": {
+    "precision": 1.0,
+    "recall": 1.0
+  },
+  "EMAIL": {
+    "precision": 1.0,
+    "recall": 1.0
+  },
+  "IFSC": {
+    "precision": 1.0,
+    "recall": 1.0
+  },
+  "PAN": {
+    "precision": 1.0,
+    "recall": 1.0
+  },
+  "PHONE": {
+    "precision": 0.75,
+    "recall": 1.0
+  },
+  "UPI": {
+    "precision": 1.0,
+    "recall": 1.0
+  }
+}

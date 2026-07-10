@@ -536,7 +536,7 @@ class TrickyEdgeCaseGenerator(SyntheticDocumentGenerator):
         self._draw_header(page3, "OCR STRESS TEST")
 
         y = 120
-        page3.insert_text(fitz.Point(50, y), "Small text: PAN: MNPQR5678S", fontsize=7, fontname="helv")
+        page3.insert_text(fitz.Point(50, y), "Small text: PAN: MNPPR5678S", fontsize=7, fontname="helv")
         y += 20
         page3.insert_text(fitz.Point(50, y), "Tight spacing: Aadhaar:555566667771 Email:user@test.com", fontsize=9, fontname="helv")
         y += 20
@@ -547,7 +547,7 @@ class TrickyEdgeCaseGenerator(SyntheticDocumentGenerator):
         page3.insert_text(fitz.Point(50, y), "Dotted: A.C. No. 1234.5678.9012  IFSC: SBIN.0001.234", fontsize=9, fontname="helv")
 
         # Ground truth for the deterministic real PII on page 3
-        self._add_pii("PAN", "MNPQR5678S", 3, "Small text:")
+        self._add_pii("PAN", "MNPPR5678S", 3, "Small text:")
         self._add_pii("AADHAAR", "555566667771", 3, "Tight spacing")
         self._add_pii("EMAIL", "user@test.com", 3, "Tight spacing")
         self._add_pii("AADHAAR", "234512341239", 3, "Mixed case")

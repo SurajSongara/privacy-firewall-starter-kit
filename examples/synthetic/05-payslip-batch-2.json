@@ -4,43 +4,43 @@
   "expectations": [
     {
       "detection_type": "PAN",
-      "text": "RRRPM4697C",
+      "text": "UUUHO0399J",
       "page_number": 1,
       "label": "PAN:"
     },
     {
       "detection_type": "AADHAAR",
-      "text": "821020458197",
+      "text": "317249901773",
       "page_number": 1,
       "label": "Aadhaar:"
     },
     {
       "detection_type": "EMAIL",
-      "text": "priyapatel744@outlook.com",
+      "text": "sanjay.mishra584@gmail.com",
       "page_number": 1,
       "label": "Email:"
     },
     {
       "detection_type": "PHONE",
-      "text": "9483589812",
+      "text": "7692542750",
       "page_number": 1,
       "label": "Phone:"
     },
     {
       "detection_type": "ACCOUNT",
-      "text": "31380580178",
+      "text": "19776541782",
       "page_number": 1,
       "label": "Account No:"
     },
     {
       "detection_type": "IFSC",
-      "text": "SBIN02A55KV",
+      "text": "SBIN0Q0DDON",
       "page_number": 1,
       "label": "IFSC:"
     },
     {
       "detection_type": "UPI",
-      "text": "priya.patel61@okicicibank",
+      "text": "sanjay.mishra8@okhdfcbank",
       "page_number": 1,
       "label": "UPI:"
     }
