@@ -4,7 +4,14 @@ from typing import Annotated
 
 import typer
 
-from privacy_firewall.cli import detect_cmd, diagnostics_cmd, doctor_cmd, redact_cmd, scan_cmd
+from privacy_firewall.cli import (
+    detect_cmd,
+    diagnostics_cmd,
+    doctor_cmd,
+    redact_cmd,
+    review_cmd,
+    scan_cmd,
+)
 
 app = typer.Typer(
     name="privacy-firewall",
@@ -17,6 +24,7 @@ app.command(name="detect")(detect_cmd)
 app.command(name="redact")(redact_cmd)
 app.command(name="diagnostics")(diagnostics_cmd)
 app.command(name="doctor")(doctor_cmd)
+app.command(name="review")(review_cmd)
 
 
 @app.callback(invoke_without_command=True)
