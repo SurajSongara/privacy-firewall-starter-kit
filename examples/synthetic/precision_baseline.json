@@ -20,7 +20,7 @@
     "recall": 1.0
   },
   "PHONE": {
-    "precision": 0.75,
+    "precision": 1.0,
     "recall": 1.0
   },
   "UPI": {

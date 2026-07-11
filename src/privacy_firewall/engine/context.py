@@ -38,7 +38,8 @@ LEXICONS: dict[str, TypeLexicon] = {
         positive=("phone", "mobile", "mob", "contact", "tel", "whatsapp", "helpline"),
         negative=(
             "utr", "rrn", "ref", "reference", "txn", "transaction",
-            "imps", "neft", "rtgs", "cheque", "invoice", "order", "a/c", "account",
+            "imps", "neft", "rtgs", "cheque", "challan", "invoice", "order",
+            "a/c", "account", "urn", "folio",
         ),
     ),
     "ACCOUNT": TypeLexicon(
@@ -57,6 +58,16 @@ NEARBY_NEGATIVE_PENALTY = 0.20
 
 DROP_FLOOR = 0.3
 """Detections demoted below this confidence are dropped entirely."""
+
+HARD_LINE_NEGATIVE_TYPES = frozenset({"PHONE"})
+"""Types where a bare candidate in same-line reference context is dropped.
+
+A bare 10-digit number on a "UTR:" / "Ref ID:" line is a transaction
+reference, not a phone number — a soft penalty would only park it in
+the ask band and it would still surface as a detection. Numbers with an
+explicit dialling prefix (``+``/trunk ``0``) keep the soft penalty:
+format evidence outweighs a nearby label.
+"""
 
 
 def _term_pattern(term: str) -> re.Pattern[str]:
@@ -196,6 +207,15 @@ class ContextScorer:
             return self._adjust(detection, LINE_POSITIVE_BOOST, f"near label '{term}'")
         term = _find_term(line, lexicon.negative)
         if term is not None:
+            if (
+                detection.detection_type in HARD_LINE_NEGATIVE_TYPES
+                and not detection.text.lstrip().startswith(("+", "0"))
+            ):
+                return self._adjust(
+                    detection,
+                    -detection.confidence,
+                    f"bare number in reference context ('{term}') — dropped",
+                )
             return self._adjust(
                 detection, -LINE_NEGATIVE_PENALTY, f"reference context on the same line ('{term}')"
             )
