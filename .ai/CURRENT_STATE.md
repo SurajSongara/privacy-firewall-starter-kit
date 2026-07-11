@@ -1,4 +1,4 @@
-Status: PHASE_4_PLANNED — Phases 1–3 complete (+ Studio/Review UX shipped ad hoc); next task F001
+Status: PHASE_4_COMPLETE — all F001–F005 shipped; 617 tests passing
 
 ## Phase 1 — Core Engine (Complete)
 
@@ -52,25 +52,26 @@ PDF/Image -> Parser (+OCR/hybrid) -> Document -> Detectors -> Fusion
 - Renderer: instance-scoped bbox search + rect dedupe — repeated-text stars
   stay styled and per-instance keep/redact decisions are honoured.
 
-## Phase 4 — Trust & Recall Pack (Planned — next task F001)
+## Phase 4 — Trust & Recall Pack (Complete)
 
-Tasks F001–F005 in `tasks/` (see `tasks/README.md`). Build order:
-review UX polish (F001) → phone precision (F002) → exact char geometry (F003)
-→ workspace memory (F004) → name detection (F005).
+F001–F005 (see `tasks/README.md` for the delivered list):
 
-Known issues Phase 4 addresses:
-
-- "No new matches" toast conflates already-marked with not-found (F001).
-- Overlapping detector + manual rects double-draw stars (F001).
-- PHONE precision 75% — UTR/Ref-ID traps on statement1-5.pdf (F002).
-- Sub-word bboxes interpolated proportionally — inexact on proportional
-  fonts; block-text/span order mismatch on glyph-heavy PDFs corrupts manual
-  mark geometry (F003).
-- Manual marks don't carry across documents in a workspace (F004).
-- No NAME detector — names are always manual marks today (F005).
+- F001: `MarkResult(added, skipped)` → honest api/mark feedback; renderer
+  merges overlapping same-type redaction rects.
+- F002: bare 10-digit numbers in transaction-reference context are dropped
+  (not parked in the ask band); PHONE 75% → 100% precision, recall intact.
+- F003: per-character glyph boundaries from `rawdict` drive sub-word mark
+  bboxes and the UI drag selection (`cx` in `/api/text`); proportional
+  fallback only for OCR words.
+- F004: workspace memory — `TermsStore` in `.privacy-firewall/terms.json`;
+  remembered marks are pre-suggested (never pre-decided) in every workspace
+  document; keep-allowlist; forget is workspace-wide. Supersedes P010.
+- F005: `NameDetector` derives NAME candidates from email local parts,
+  profile handles, and the page-1 title line; two evidence kinds → 0.9,
+  one → 0.6 (ask), title-only → nothing. Heuristic fusion tier.
 
 ## Environment notes
 
 - Python >= 3.12 (project runs on 3.14); `paddlepaddle` has no 3.14 wheel, so
   the PaddleOCR adapter fails to register — Tesseract is the working default.
-- 586 tests passing, ruff clean, mypy strict clean.
+- 617 tests passing, ruff clean, mypy strict clean.

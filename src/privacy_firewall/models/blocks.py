@@ -73,11 +73,14 @@ class TextBlock(Block):
     spans: list[TextSpan] = Field(default_factory=list)
 
     def bbox_for_span(self, start: int, end: int) -> BoundingBox:
-        """Compute the union of bounding boxes covering a character range.
+        """Compute the bounding box covering a character range of ``text``.
 
-        Walks the per-span text, maps character offsets to spans, and
-        returns the minimal bounding rectangle enclosing all spans that
-        overlap the interval ``[start, end)``.
+        Character offsets are aligned to ``text`` by *locating* each
+        span's word in it (robust to whatever separator joined the
+        words — a blind cumulative walk drifts by one character per
+        separator). Words only partially covered by ``[start, end)``
+        are clipped horizontally in proportion to the covered
+        characters, so a sub-word range gets a sub-word box.
 
         Args:
             start: Character offset (0-based) of the start of the range.
@@ -85,8 +88,8 @@ class TextBlock(Block):
                 (exclusive).
 
         Returns:
-            The union ``BoundingBox`` of all overlapping spans, or the
-            block-level ``self.bbox`` if no spans are available.
+            The union ``BoundingBox`` of the covered (parts of) words,
+            or the block-level ``self.bbox`` if no spans overlap.
         """
         if not self.spans:
             return self.bbox
@@ -97,16 +100,24 @@ class TextBlock(Block):
         found = False
 
         for span in self.spans:
-            span_len = len(span.text)
-            span_start = pos
-            span_end = pos + span_len
-            if span_start < end and span_end > start:
-                x0 = min(x0, span.bbox.x0)
-                y0 = min(y0, span.bbox.y0)
-                x1 = max(x1, span.bbox.x1)
-                y1 = max(y1, span.bbox.y1)
-                found = True
-            pos += span_len
+            if not span.text:
+                continue
+            offset = self.text.find(span.text, pos)
+            if offset < 0:
+                offset = pos
+            pos = offset + len(span.text)
+            overlap_start = max(start, offset)
+            overlap_end = min(end, offset + len(span.text))
+            if overlap_start >= overlap_end:
+                continue
+            found = True
+            width = span.bbox.x1 - span.bbox.x0
+            frac_start = (overlap_start - offset) / len(span.text)
+            frac_end = (overlap_end - offset) / len(span.text)
+            x0 = min(x0, span.bbox.x0 + frac_start * width)
+            x1 = max(x1, span.bbox.x0 + frac_end * width)
+            y0 = min(y0, span.bbox.y0)
+            y1 = max(y1, span.bbox.y1)
 
         if not found:
             return self.bbox

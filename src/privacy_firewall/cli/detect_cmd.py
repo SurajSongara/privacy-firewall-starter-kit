@@ -11,6 +11,7 @@ from privacy_firewall.detectors import (
     DetectorRegistry,
     EmailDetector,
     IFSCDetector,
+    NameDetector,
     PANDetector,
     PhoneDetector,
     UpiDetector,
@@ -39,6 +40,7 @@ def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
         "upi": UpiDetector,
         "ifsc": IFSCDetector,
         "account": AccountDetector,
+        "name": NameDetector,
     }
 
     registry = DetectorRegistry()

@@ -84,6 +84,11 @@ class TestReviewServer:
         assert response.status_code == 200
         body = response.json()
         assert body["added"] == 1
+        assert body["skipped"] == 0
+        # Marking the same text again finds the match but adds nothing.
+        again = client.post("/api/mark", json={"text": "Ramesh Kumar", "label": "name"}).json()
+        assert again["added"] == 0
+        assert again["skipped"] == 1
         entry = body["entries"][0]
         assert entry["type"] == "NAME"
         assert entry["detector"] == "manual"

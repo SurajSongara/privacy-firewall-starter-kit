@@ -172,10 +172,44 @@ class PDFRenderer:
 
             if not jobs:
                 continue
+            jobs = PDFRenderer._merge_overlapping_jobs(jobs)
             try:
                 PDFRenderer._redact_preserving_layout(page, jobs)
             except Exception:  # noqa: BLE001 - layout preservation is best-effort
                 PDFRenderer._redact_legacy(page, jobs)
+
+    @staticmethod
+    def _merge_overlapping_jobs(
+        jobs: list[tuple[Any, RedactionType, str]],
+    ) -> list[tuple[Any, RedactionType, str]]:
+        """Merge same-type jobs whose rects overlap into their union.
+
+        Two detections can cover the same text with *different* rects
+        (e.g. a detector's full-width email plus a manual mark of the
+        same email) — drawing both would paint stars over stars. The
+        union keeps one clean patch; the wider rect's replacement wins
+        (it mirrors more of the original text's length).
+        """
+        merged: list[tuple[Any, RedactionType, str]] = []
+        for rect, rtype, replacement in jobs:
+            rect = fitz.Rect(rect)
+            while True:
+                hit = next(
+                    (
+                        i
+                        for i, (mrect, mtype, _mrepl) in enumerate(merged)
+                        if mtype == rtype and rect.intersects(mrect)
+                    ),
+                    None,
+                )
+                if hit is None:
+                    break
+                mrect, _mtype, mrepl = merged.pop(hit)
+                if mrect.width > rect.width:
+                    replacement = mrepl
+                rect |= mrect
+            merged.append((rect, rtype, replacement))
+        return merged
 
     @staticmethod
     def _redact_preserving_layout(page: Any, jobs: list[tuple[Any, RedactionType, str]]) -> None:

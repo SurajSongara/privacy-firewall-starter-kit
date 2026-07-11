@@ -63,6 +63,29 @@ class TestContextScorer:
         d = _detection("234512341234", block, confidence=DROP_FLOOR + 0.05)
         assert self.scorer.apply(doc, [d]) == []
 
+    def test_bare_phone_in_reference_context_is_dropped(self) -> None:
+        # A bare 10-digit number on a UTR/Ref line is a transaction
+        # reference — hard-dropped, not parked in the ask band.
+        for block in ("UTR: 7987465071", "Ref ID: 8223027920"):
+            doc = _document(block)
+            d = _detection(block.split()[-1], block, detection_type="PHONE", confidence=0.85)
+            assert self.scorer.apply(doc, [d]) == [], block
+
+    def test_prefixed_phone_in_reference_context_keeps_soft_penalty(self) -> None:
+        # An explicit dialling prefix is format evidence — only demote.
+        block = "UTR mentioned, call +91-7987465071"
+        doc = _document(block)
+        d = _detection("+91-7987465071", block, detection_type="PHONE", confidence=0.9)
+        [scored] = self.scorer.apply(doc, [d])
+        assert 0 < scored.confidence < 0.9
+
+    def test_phone_positive_label_beats_reference_context(self) -> None:
+        block = "Mobile: 7987465071 (txn ref 12345)"
+        doc = _document(block)
+        d = _detection("7987465071", block, detection_type="PHONE", confidence=0.85)
+        [scored] = self.scorer.apply(doc, [d])
+        assert scored.confidence > 0.85
+
     def test_positive_beats_negative_at_same_proximity(self) -> None:
         block = "Aadhaar ref: 234512341234"
         doc = _document(block)

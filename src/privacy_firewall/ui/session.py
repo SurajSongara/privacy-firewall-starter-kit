@@ -7,8 +7,11 @@ testable without the ``ui`` extra installed.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import fitz
 
 from privacy_firewall.detectors import (
     AadhaarDetector,
@@ -16,6 +19,7 @@ from privacy_firewall.detectors import (
     DetectorRegistry,
     EmailDetector,
     IFSCDetector,
+    NameDetector,
     PANDetector,
     PhoneDetector,
     UpiDetector,
@@ -36,13 +40,27 @@ from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
 from privacy_firewall.models.geometry import BoundingBox, Span
-from privacy_firewall.policy.models import Policy
+from privacy_firewall.policy.models import Policy, PolicyAction
 from privacy_firewall.renderer.page_images import (
     DEFAULT_DPI,
     render_page_image,
     render_page_image_bytes,
 )
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
+from privacy_firewall.ui.terms import TermsStore
+
+
+@dataclass(frozen=True)
+class MarkResult:
+    """Outcome of a :meth:`ReviewSession.mark_text` call.
+
+    Attributes:
+        added: The newly created review entries.
+        skipped: Matches that were found but already in the plan.
+    """
+
+    added: list[ReviewEntry]
+    skipped: int
 
 
 class ReviewSession:
@@ -58,6 +76,7 @@ class ReviewSession:
         ocr_provider: str | None = None,
         dpi: int = DEFAULT_DPI,
         lazy: bool = False,
+        terms_store: TermsStore | None = None,
     ) -> None:
         """Set up the session and (unless *lazy*) run the pipeline.
 
@@ -70,6 +89,8 @@ class ReviewSession:
             dpi: Page-image render resolution.
             lazy: Skip the pipeline; the caller invokes :meth:`run` later
                 (e.g. in a background thread while the server starts).
+            terms_store: Workspace terms remembered across documents;
+                their instances are pre-suggested (never pre-decided).
         """
         self.pdf_path = Path(pdf_path)
         self.policy = policy
@@ -77,7 +98,10 @@ class ReviewSession:
         self.force_ocr = force_ocr
         self.auto = auto
         self.ocr_provider = ocr_provider
+        self.terms_store = terms_store
+        self._applied_term_keys: set[tuple[str, str]] = set()
         self._page_cache: dict[int, bytes] = {}
+        self._char_words_cache: dict[int, dict[str, list[dict[str, Any]]]] = {}
         self._preview_pdf: bytes | None = None
         self._preview_key: int | None = None
         self._document: Document | None = None
@@ -173,6 +197,7 @@ class ReviewSession:
             UpiDetector(),
             IFSCDetector(),
             AccountDetector(),
+            NameDetector(),
         ):
             registry.register(detector)
 
@@ -193,6 +218,8 @@ class ReviewSession:
 
         self._document = document
         self._plan = plan
+        self._applied_term_keys.clear()
+        self.sync_remembered_terms()
         self.status = "ready"
 
     def _set_stage(self, stage: str) -> None:
@@ -253,6 +280,7 @@ class ReviewSession:
                 "decisions": self.restored_decisions,
                 "manual": self.restored_manual,
             },
+            "workspace_terms": self.terms_store is not None,
             "pages": [
                 {"page_number": p.page_number, "width": p.width, "height": p.height}
                 for p in self.document.pages
@@ -301,7 +329,10 @@ class ReviewSession:
 
         Returns:
             One dict per word: ``{"text", "x0", "y0", "x1", "y1"}`` in
-            PDF coordinates.
+            PDF coordinates, plus ``"cx"`` — the ``len(text) + 1``
+            character boundary x-positions — when the word could be
+            matched to the PDF's own text layer (native text; OCR words
+            have no reliable per-character geometry).
 
         Raises:
             ValueError: If the page does not exist.
@@ -309,18 +340,21 @@ class ReviewSession:
         for page in self.document.pages:
             if page.page_number != page_number:
                 continue
-            return [
-                {"text": span.text, **span.bbox.model_dump()}
-                for block in page.blocks
-                if isinstance(block, TextBlock)
-                for span in block.spans
-            ]
+            words: list[dict[str, Any]] = []
+            for block in page.blocks:
+                if not isinstance(block, TextBlock):
+                    continue
+                for span in block.spans:
+                    word: dict[str, Any] = {"text": span.text, **span.bbox.model_dump()}
+                    boundaries = self._char_boundaries(page_number, span.text, span.bbox)
+                    if boundaries is not None:
+                        word["cx"] = boundaries
+                    words.append(word)
+            return words
         msg = f"page {page_number} not found"
         raise ValueError(msg)
 
-    def mark_text(
-        self, text: str, label: str, *, case_sensitive: bool = False
-    ) -> list[ReviewEntry]:
+    def mark_text(self, text: str, label: str, *, case_sensitive: bool = False) -> MarkResult:
         """Mark every instance of *text* in the document as PII.
 
         Each occurrence becomes a manual ``Detection`` (detector name
@@ -337,12 +371,124 @@ class ReviewSession:
             case_sensitive: Require an exact-case match.
 
         Returns:
-            The newly added entries (empty if nothing matched or every
-            match was already in the plan).
+            A :class:`MarkResult` with the newly added entries and the
+            count of matches skipped because they were already marked —
+            so the caller can tell "nothing found" from "all already
+            marked".
 
         Raises:
             ValueError: If *text* or *label* is blank.
         """
+        return self._mark_instances(
+            text,
+            label,
+            case_sensitive=case_sensitive,
+            detector_name="manual",
+            detection_reason="marked as PII by the reviewer",
+            suggested=SuggestedAction.REDACT,
+            suggestion_reason="manually marked during review",
+            decision=ReviewDecision.REDACT,
+        )
+
+    def remember_text(self, text: str, label: str, *, case_sensitive: bool = False) -> bool:
+        """Add a term to the workspace store (no-op without a store).
+
+        Returns:
+            ``True`` if the term was newly remembered.
+        """
+        if self.terms_store is None:
+            return False
+        return self.terms_store.add(
+            text,
+            "_".join(label.split()).upper(),
+            case_sensitive=case_sensitive,
+            added_from=self.pdf_path.name,
+        )
+
+    def sync_remembered_terms(self) -> int:
+        """Apply workspace terms not yet suggested in this session.
+
+        Each active term's instances are added like :meth:`mark_text`
+        but with detector name ``"remembered"``, the *policy's* action
+        as the suggestion, and **no** decision — remembered terms are
+        suggestions the reviewer confirms. Idempotent; safe to call on
+        every plan read so terms remembered in one document surface in
+        the others without a restart.
+
+        Returns:
+            The number of entries added by this call.
+        """
+        if self.terms_store is None or self._plan is None:
+            return 0
+        added = 0
+        suggested_for = {
+            PolicyAction.REDACT: SuggestedAction.REDACT,
+            PolicyAction.KEEP: SuggestedAction.KEEP,
+            PolicyAction.ASK: SuggestedAction.ASK,
+        }
+        for term in self.terms_store.active_terms():
+            if term.key in self._applied_term_keys:
+                continue
+            self._applied_term_keys.add(term.key)
+            origin = f" (from {term.added_from})" if term.added_from else ""
+            result = self._mark_instances(
+                term.text,
+                term.label,
+                case_sensitive=term.case_sensitive,
+                detector_name="remembered",
+                detection_reason=f"remembered workspace term{origin}",
+                suggested=suggested_for[self.policy.type_policy(term.label).action],
+                suggestion_reason="suggested from workspace memory",
+                decision=None,
+            )
+            added += len(result.added)
+        return added
+
+    def forget_term(self, detection_id: str) -> bool:
+        """Forget the workspace term behind a remembered entry.
+
+        Removes the term from the store and every entry it produced in
+        this session (the term would otherwise resurface on the next
+        sync).
+
+        Args:
+            detection_id: Id of any entry the term produced.
+
+        Returns:
+            ``True`` if the entry was a remembered one and was removed.
+        """
+        entry = self.plan.entry_by_id(detection_id)
+        if entry is None or entry.detection.detector_name != "remembered":
+            return False
+        text = entry.detection.text
+        label = entry.detection.detection_type
+        key = (text.casefold(), label)
+        self.plan.entries = [
+            e
+            for e in self.plan.entries
+            if not (
+                e.detection.detector_name == "remembered"
+                and (e.detection.text.casefold(), e.detection.detection_type) == key
+            )
+        ]
+        self._applied_term_keys.discard(key)
+        if self.terms_store is not None:
+            self.terms_store.remove(text, label)
+        return True
+
+    def _mark_instances(
+        self,
+        text: str,
+        label: str,
+        *,
+        case_sensitive: bool,
+        detector_name: str,
+        detection_reason: str,
+        suggested: SuggestedAction,
+        suggestion_reason: str,
+        decision: ReviewDecision | None,
+    ) -> MarkResult:
+        """Add one entry per instance of *text* in the document."""
         tokens = text.split()
         if not tokens:
             msg = "text to mark must not be blank"
@@ -358,6 +504,7 @@ class ReviewSession:
         )
         known_ids = {entry.detection_id for entry in self.plan.entries}
         added: list[ReviewEntry] = []
+        skipped = 0
 
         for page in self.document.pages:
             # Spans are offset into a page-level concatenation of block
@@ -371,23 +518,26 @@ class ReviewSession:
                 page_offset += len(block.text) + 1
                 for match in pattern.finditer(block.text):
                     detection = Detection(
-                        detector_name="manual",
+                        detector_name=detector_name,
                         detection_type=normalized_label,
                         text=match.group(),
                         span=Span(start=base + match.start(), end=base + match.end()),
-                        bbox=self._char_range_bbox(block, match.start(), match.end()),
+                        bbox=self._char_range_bbox(
+                            page.page_number, block, match.start(), match.end()
+                        ),
                         page_number=page.page_number,
                         confidence=1.0,
-                        reasons=("marked as PII by the reviewer",),
+                        reasons=(detection_reason,),
                     )
                     if detection.detection_id in known_ids:
+                        skipped += 1
                         continue
                     known_ids.add(detection.detection_id)
                     entry = ReviewEntry(
                         detection=detection,
-                        suggested_action=SuggestedAction.REDACT,
-                        suggestion_reasons=("manually marked during review",),
-                        decision=ReviewDecision.REDACT,
+                        suggested_action=suggested,
+                        suggestion_reasons=(suggestion_reason,),
+                        decision=decision,
                     )
                     self.plan.entries.append(entry)
                     added.append(entry)
@@ -400,14 +550,15 @@ class ReviewSession:
                     e.detection.detection_type,
                 )
             )
-        return added
+        return MarkResult(added=added, skipped=skipped)
 
     def remove_manual_entry(self, detection_id: str) -> bool:
         """Remove a manually marked entry from the plan.
 
         Only entries created by :meth:`mark_text` can be removed —
         detector-produced entries are kept as the audit trail (use a
-        *keep* decision to exclude them instead).
+        *keep* decision to exclude them instead). For entries produced
+        by a workspace term, use :meth:`forget_term`.
 
         Args:
             detection_id: Id of the manual entry to remove.
@@ -421,14 +572,17 @@ class ReviewSession:
         self.plan.entries.remove(entry)
         return True
 
-    @staticmethod
-    def _char_range_bbox(block: TextBlock, start: int, end: int) -> BoundingBox:
+    def _char_range_bbox(
+        self, page_number: int, block: TextBlock, start: int, end: int
+    ) -> BoundingBox:
         """Bounding box for a character range of ``block.text``.
 
         Unlike :meth:`TextBlock.bbox_for_span`, offsets are aligned to
         ``block.text`` (which joins words with separators) by locating
-        each word in the text, and partially covered words are clipped
-        horizontally in proportion to the covered characters.
+        each word in the text. Partially covered words are clipped at
+        real glyph boundaries from the PDF's text layer when available,
+        falling back to proportional interpolation (exact only for
+        monospace) when the word has no per-character geometry (OCR).
         """
         if not block.spans:
             return block.bbox
@@ -449,17 +603,92 @@ class ReviewSession:
             if overlap_start >= overlap_end:
                 continue
             found = True
-            width = span.bbox.x1 - span.bbox.x0
-            frac_start = (overlap_start - offset) / len(span.text)
-            frac_end = (overlap_end - offset) / len(span.text)
-            x0 = min(x0, span.bbox.x0 + frac_start * width)
-            x1 = max(x1, span.bbox.x0 + frac_end * width)
+            rel_start = overlap_start - offset
+            rel_end = overlap_end - offset
+            boundaries = self._char_boundaries(page_number, span.text, span.bbox)
+            if boundaries is not None:
+                x0 = min(x0, boundaries[rel_start])
+                x1 = max(x1, boundaries[rel_end])
+            else:
+                width = span.bbox.x1 - span.bbox.x0
+                x0 = min(x0, span.bbox.x0 + rel_start / len(span.text) * width)
+                x1 = max(x1, span.bbox.x0 + rel_end / len(span.text) * width)
             y0 = min(y0, span.bbox.y0)
             y1 = max(y1, span.bbox.y1)
 
         if not found:
             return block.bbox
         return BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1)
+
+    def _char_boundaries(
+        self, page_number: int, text: str, bbox: BoundingBox
+    ) -> list[float] | None:
+        """Character boundary x-positions for one word, if the PDF knows them.
+
+        Matches the word against the PDF text layer's per-character
+        geometry by text and position. Returns ``len(text) + 1``
+        ascending x-values (glyph left edges plus the final right edge),
+        or ``None`` for words the text layer cannot vouch for (OCR
+        words, or ligature/encoding mismatches).
+        """
+        candidates = self._page_char_words(page_number).get(text)
+        if not candidates:
+            return None
+        for entry in candidates:
+            if abs(entry["x0"] - bbox.x0) <= 2.0 and abs(entry["y0"] - bbox.y0) <= 2.0:
+                boundaries: list[float] = entry["cx"]
+                if len(boundaries) == len(text) + 1:
+                    return boundaries
+        return None
+
+    def _page_char_words(self, page_number: int) -> dict[str, list[dict[str, Any]]]:
+        """Whitespace-delimited words with per-char geometry, keyed by text.
+
+        Built once per page from PyMuPDF's ``rawdict`` of the source PDF
+        (same extraction family as ``get_text("words")``, so word texts
+        line up with the parser's spans on native documents).
+        """
+        cached = self._char_words_cache.get(page_number)
+        if cached is not None:
+            return cached
+
+        index: dict[str, list[dict[str, Any]]] = {}
+        try:
+            with fitz.open(str(self.pdf_path)) as doc:
+                raw = doc[page_number - 1].get_text("rawdict")
+        except Exception:  # noqa: BLE001 - char geometry is best-effort
+            self._char_words_cache[page_number] = index
+            return index
+
+        def flush(chars: list[tuple[str, tuple[float, float, float, float]]]) -> None:
+            if not chars:
+                return
+            word_text = "".join(c for c, _ in chars)
+            rects = [r for _, r in chars]
+            entry = {
+                "x0": min(r[0] for r in rects),
+                "y0": min(r[1] for r in rects),
+                "cx": [r[0] for r in rects] + [max(r[2] for r in rects)],
+            }
+            index.setdefault(word_text, []).append(entry)
+
+        for raw_block in raw.get("blocks", []):
+            if raw_block.get("type") != 0:
+                continue
+            for line in raw_block.get("lines", []):
+                for raw_span in line.get("spans", []):
+                    pending: list[tuple[str, tuple[float, float, float, float]]] = []
+                    for char in raw_span.get("chars", []):
+                        c = char.get("c", "")
+                        if not c or c.isspace():
+                            flush(pending)
+                            pending = []
+                            continue
+                        pending.append((c, tuple(char["bbox"])))
+                    flush(pending)
+
+        self._char_words_cache[page_number] = index
+        return index
 
     def page_png(self, page_number: int) -> bytes:
         """Rendered PNG for a page (cached per session)."""

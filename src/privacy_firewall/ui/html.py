@@ -350,6 +350,10 @@ PAGE_HTML = r"""<!doctype html>
         <label class="chk"><input type="checkbox" id="search-case"> Match case</label>
         <button id="search-mark">Mark</button>
       </div>
+      <div class="row" id="search-remember-row" style="display:none">
+        <label class="chk"><input type="checkbox" id="search-remember">
+          Remember for every document in this workspace</label>
+      </div>
     </div>
     <div id="filter-tabs"></div>
     <div id="groups"></div>
@@ -382,6 +386,8 @@ PAGE_HTML = r"""<!doctype html>
     <option>ID_NUMBER</option><option>CUSTOM</option>
   </datalist>
   <label class="chk"><input type="checkbox" id="match-case"> Match case</label>
+  <label class="chk" id="remember-row" style="display:none">
+    <input type="checkbox" id="remember-term"> Remember for this workspace</label>
   <div class="actions">
     <button class="btn" id="cancel-mark">Cancel</button>
     <button class="btn mark" id="mark-btn">Mark all instances</button>
@@ -465,6 +471,10 @@ async function boot() {
   }
   PLAN = await api("api/plan");
   document.getElementById("loading").style.display = "none";
+  if (PLAN.workspace_terms) {
+    document.getElementById("search-remember-row").style.display = "";
+    document.getElementById("remember-row").style.display = "";
+  }
   initPages();
   render();
   const restored = PLAN.restored || {decisions: 0, manual: 0};
@@ -555,6 +565,7 @@ function renderSidebar() {
       row.className = "entry" + (e.detection_id === FOCUS ? " focus" : "");
       row.dataset.id = e.detection_id;
       const manual = e.detector === "manual";
+      const remembered = e.detector === "remembered";
       row.innerHTML = `
         <div class="row1">
           <select data-id="${e.detection_id}" class="is-${e.effective_action === "keep" ? "keep" : "redact"}">
@@ -563,8 +574,10 @@ function renderSidebar() {
           </select>
           <code>${esc(e.text)}</code>
           ${manual ? '<span class="chip">manual</span>' : ""}
+          ${remembered ? '<span class="chip">remembered</span>' : ""}
           <span class="meta2">p.${e.page_number} · ${e.confidence.toFixed(2)}</span>
           ${manual ? `<button class="rm" data-id="${e.detection_id}" title="Remove manual mark">✕</button>` : ""}
+          ${remembered ? `<button class="rm" data-id="${e.detection_id}" title="Forget this workspace term (all documents)">✕</button>` : ""}
         </div>
         <div class="why">${esc(e.reasons.join(" · "))}</div>`;
       row.addEventListener("click", ev => {
@@ -724,8 +737,13 @@ function layoutTextLayer(p, wrap) {
     el.style.fontSize = Math.max(h * 0.85, 4) + "px";
     el.style.lineHeight = h + "px";
     layer.appendChild(el);
+    // fr: character boundary positions as fractions of the word width
+    // (from the PDF's real glyph geometry) — null for OCR words.
+    const width = w.x1 - w.x0;
+    const fr = (w.cx && width > 0 && w.cx.length === w.text.length + 1)
+      ? w.cx.map(v => (v - w.x0) / width) : null;
     items.push({el: el, x: w.x0 * scale, y: w.y0 * scale,
-                w: (w.x1 - w.x0) * scale, h: h});
+                w: (w.x1 - w.x0) * scale, h: h, fr: fr});
   }
   const widths = items.map(it => it.el.offsetWidth);   // batch reads
   items.forEach((it, i) => {                            // then batch writes
@@ -843,11 +861,21 @@ function dragRect(e) {
           w: Math.abs(x1 - drag.x0), h: Math.abs(y1 - drag.y0)};
 }
 
+function nearestBoundary(fr, f) {
+  let best = 0, dist = Infinity;
+  for (let i = 0; i < fr.length; i++) {
+    const d = Math.abs(fr[i] - f);
+    if (d < dist) { dist = d; best = i; }
+  }
+  return best;
+}
+
 function highlightRect(rect) {
   // Words fully inside the band are selected whole; words the band's left
-  // or right edge cuts through are clipped to a character range, mapped
-  // proportionally (exact for monospace text, ~1 char off otherwise —
-  // the popup lets the reviewer trim the text before marking).
+  // or right edge cuts through are clipped to a character range. Words
+  // with real glyph boundaries (it.fr, from the PDF text layer) snap to
+  // the nearest glyph edge; OCR words fall back to proportional mapping
+  // (exact for monospace — the popup lets the reviewer trim anyway).
   const items = LAYOUT[drag.page] || [];
   for (const it of items) {
     const hit = it.x < rect.x + rect.w && it.x + it.w > rect.x &&
@@ -855,15 +883,23 @@ function highlightRect(rect) {
     const len = it.el.textContent.length;
     let from = 0, to = 0;
     if (hit && len > 0 && it.w > 0) {
-      from = Math.max(0, Math.round((rect.x - it.x) / it.w * len));
-      to = Math.min(len, Math.round((rect.x + rect.w - it.x) / it.w * len));
+      const f0 = (rect.x - it.x) / it.w;
+      const f1 = (rect.x + rect.w - it.x) / it.w;
+      if (it.fr) {
+        from = nearestBoundary(it.fr, f0);
+        to = nearestBoundary(it.fr, f1);
+      } else {
+        from = Math.max(0, Math.round(f0 * len));
+        to = Math.min(len, Math.round(f1 * len));
+      }
     }
     const sel = to > from;
     it.selFrom = sel ? from : null;
     it.selTo = sel ? to : null;
     it.el.classList.toggle("sel", sel);
     if (sel && (from > 0 || to < len)) {
-      const f0 = from / len * 100, f1 = to / len * 100;
+      const f0 = (it.fr ? it.fr[from] : from / len) * 100;
+      const f1 = (it.fr ? it.fr[to] : to / len) * 100;
       it.el.style.background = `linear-gradient(90deg, transparent ${f0}%, ` +
         `rgba(99,102,241,.35) ${f0}% ${f1}%, transparent ${f1}%)`;
     } else {
@@ -938,15 +974,21 @@ async function bulkDecide(type, act) {
     }});
 }
 
-async function markText(text, label, caseSensitive) {
+async function markText(text, label, caseSensitive, remember) {
   try {
     const result = await api("api/mark",
-      {text: text, label: label, case_sensitive: caseSensitive});
-    if (result.added === 0) {
-      toast("No new matches — the text was not found (or is already marked).", "warn");
+      {text: text, label: label, case_sensitive: caseSensitive, remember: !!remember});
+    const skipped = result.skipped || 0;
+    const suffix = result.remembered ? " Remembered for this workspace." : "";
+    if (result.added === 0 && skipped > 0) {
+      toast("All " + skipped + (skipped > 1 ? " matches are" : " match is") +
+            " already marked." + suffix);
+    } else if (result.added === 0) {
+      toast("Text not found in the document.", "warn");
     } else {
       toast("Marked " + result.added + " instance" + (result.added > 1 ? "s" : "") +
-            " as " + label.toUpperCase() + " for redaction.");
+            " as " + label.toUpperCase() + " for redaction" +
+            (skipped > 0 ? " (" + skipped + " already marked)" : "") + "." + suffix);
     }
     await refreshPlan();
   } catch (err) {
@@ -960,8 +1002,10 @@ async function markSelection() {
   if (!text) { toast("The text to mark is empty.", "warn"); return; }
   const label = document.getElementById("label-input").value.trim() || "CUSTOM";
   const caseSensitive = document.getElementById("match-case").checked;
+  const remember = document.getElementById("remember-term").checked;
+  document.getElementById("remember-term").checked = false;
   hidePopup();
-  await markText(text, label, caseSensitive);
+  await markText(text, label, caseSensitive, remember);
 }
 document.getElementById("mark-btn").addEventListener("click", markSelection);
 document.getElementById("cancel-mark").addEventListener("click", hidePopup);
@@ -976,7 +1020,9 @@ document.getElementById("search-mark").addEventListener("click", async () => {
   const text = document.getElementById("search-text").value.trim();
   if (!text) { toast("Type the text to mark first.", "warn"); return; }
   const label = document.getElementById("search-label").value.trim() || "CUSTOM";
-  await markText(text, label, document.getElementById("search-case").checked);
+  const remember = document.getElementById("search-remember").checked;
+  document.getElementById("search-remember").checked = false;
+  await markText(text, label, document.getElementById("search-case").checked, remember);
   document.getElementById("search-text").value = "";
 });
 document.getElementById("search-text").addEventListener("keydown", e => {
@@ -984,11 +1030,15 @@ document.getElementById("search-text").addEventListener("keydown", e => {
 });
 
 async function removeManual(id) {
+  const entry = PLAN.entries.find(e => e.detection_id === id);
+  const remembered = entry && entry.detector === "remembered";
   try {
     await api("api/remove", {detection_id: id});
-    PLAN.entries = PLAN.entries.filter(e => e.detection_id !== id);
-    render();
-    toast("Manual mark removed.");
+    // Forgetting a workspace term removes its sibling entries too —
+    // reload the plan rather than filtering the single id.
+    await refreshPlan();
+    toast(remembered ? "Workspace term forgotten — removed from all suggestions."
+                     : "Manual mark removed.");
   } catch (err) {
     toast("Remove failed: " + err.message, "warn");
   }
@@ -1174,7 +1224,8 @@ STUDIO_HTML = r"""<!doctype html>
     <input type="file" id="drop-file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.txt,.md,.docx" multiple>
   </div>
 
-  <div class="section-title">Documents in this workspace</div>
+  <div class="section-title">Documents in this workspace
+    <span id="terms-note" style="text-transform:none;font-weight:400"></span></div>
   <div id="docs"></div>
 </main>
 
@@ -1230,6 +1281,9 @@ async function refresh() {
     docs.innerHTML = '<div class="empty">Could not load documents.</div>';
     return;
   }
+  const note = document.getElementById("terms-note");
+  note.textContent = data.terms
+    ? "· " + data.terms + " remembered term" + (data.terms > 1 ? "s" : "") : "";
   if (!data.documents.length) {
     docs.innerHTML = '<div class="empty">No documents yet. Drop a file above to get started.</div>';
     return;

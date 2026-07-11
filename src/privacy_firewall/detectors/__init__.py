@@ -9,6 +9,7 @@ from privacy_firewall.detectors.account_detector import AccountDetector
 from privacy_firewall.detectors.base import BaseDetector
 from privacy_firewall.detectors.email_detector import EmailDetector
 from privacy_firewall.detectors.ifsc_detector import IFSCDetector
+from privacy_firewall.detectors.name_detector import NameDetector
 from privacy_firewall.detectors.pan_detector import PANDetector
 from privacy_firewall.detectors.phone_detector import PhoneDetector
 from privacy_firewall.detectors.regex_detector import RegexDetector
@@ -26,6 +27,7 @@ __all__ = [
     "DetectorRun",
     "EmailDetector",
     "IFSCDetector",
+    "NameDetector",
     "PANDetector",
     "PhoneDetector",
     "RegexDetector",

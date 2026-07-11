@@ -95,7 +95,7 @@ class TestReviewSession:
         first = ReviewSession(pii_pdf, BUILTIN_POLICIES["share-with-ai"])
         entry_id = first.plan.entries[0].detection_id
         assert first.set_decision(entry_id, "keep")
-        marked = first.mark_text("Ramesh Kumar", "NAME", case_sensitive=True)
+        marked = first.mark_text("Ramesh Kumar", "NAME", case_sensitive=True).added
         assert marked
         first.save_plan()
 
@@ -163,7 +163,7 @@ class TestReviewSession:
             session.page_words(99)
 
     def test_mark_text_marks_all_instances(self, session: ReviewSession) -> None:
-        entries = session.mark_text("Ramesh Kumar", "name")
+        entries = session.mark_text("Ramesh Kumar", "name").added
         assert len(entries) == 2  # "Ramesh Kumar" + "RAMESH KUMAR" (case-insensitive)
         for entry in entries:
             assert entry.detection.detector_name == "manual"
@@ -184,25 +184,56 @@ class TestReviewSession:
         doc.save(str(path))
         doc.close()
         session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"])
-        entries = session.mark_text("Ramesh Kumar", "NAME")
+        entries = session.mark_text("Ramesh Kumar", "NAME").added
         assert len(entries) == 2
         assert entries[0].detection_id != entries[1].detection_id
         boxes = {(round(e.detection.bbox.y0), round(e.detection.bbox.y1)) for e in entries}
         assert len(boxes) == 2
 
+    def test_mark_substring_bbox_is_glyph_exact_on_proportional_font(self, tmp_path: Path) -> None:
+        # helv is proportional: uniform interpolation would misplace the
+        # box; real glyph boundaries from rawdict must match search_for.
+        path = tmp_path / "prop.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 100), "File WilliamMcIlvanney_GenAI_v2b.pdf end", fontsize=12)
+        expected = page.search_for("GenAI")[0]
+        doc.save(str(path))
+        doc.close()
+
+        session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"])
+        [entry] = session.mark_text("GenAI", "KEYWORD").added
+        bbox = entry.detection.bbox
+        assert abs(bbox.x0 - expected.x0) < 0.5
+        assert abs(bbox.x1 - expected.x1) < 0.5
+
+    def test_page_words_carry_char_boundaries(self, session: ReviewSession) -> None:
+        words = session.page_words(1)
+        with_cx = [w for w in words if "cx" in w]
+        assert with_cx, "native document words should expose char boundaries"
+        for w in with_cx:
+            assert len(w["cx"]) == len(w["text"]) + 1
+            assert w["cx"] == sorted(w["cx"])
+            assert abs(w["cx"][0] - w["x0"]) < 1.0
+            assert abs(w["cx"][-1] - w["x1"]) < 1.0
+
     def test_mark_text_case_sensitive(self, session: ReviewSession) -> None:
-        entries = session.mark_text("Ramesh Kumar", "NAME", case_sensitive=True)
+        entries = session.mark_text("Ramesh Kumar", "NAME", case_sensitive=True).added
         assert len(entries) == 1
         assert entries[0].detection.text == "Ramesh Kumar"
 
     def test_mark_text_is_idempotent(self, session: ReviewSession) -> None:
         first = session.mark_text("Ramesh", "NAME")
-        assert first
+        assert first.added
+        assert first.skipped == 0
         again = session.mark_text("Ramesh", "NAME")
-        assert again == []
+        assert again.added == []
+        assert again.skipped == len(first.added)
 
     def test_mark_text_no_match(self, session: ReviewSession) -> None:
-        assert session.mark_text("not in the document", "X") == []
+        result = session.mark_text("not in the document", "X")
+        assert result.added == []
+        assert result.skipped == 0
 
     def test_mark_text_blank_raises(self, session: ReviewSession) -> None:
         with pytest.raises(ValueError, match="blank"):
@@ -211,11 +242,11 @@ class TestReviewSession:
             session.mark_text("Ramesh", "   ")
 
     def test_mark_text_normalises_label(self, session: ReviewSession) -> None:
-        entries = session.mark_text("Ramesh", "customer name")
+        entries = session.mark_text("Ramesh", "customer name").added
         assert entries[0].detection.detection_type == "CUSTOMER_NAME"
 
     def test_remove_manual_entry(self, session: ReviewSession) -> None:
-        entry = session.mark_text("Ramesh Kumar", "NAME", case_sensitive=True)[0]
+        entry = session.mark_text("Ramesh Kumar", "NAME", case_sensitive=True).added[0]
         assert session.remove_manual_entry(entry.detection_id)
         assert session.plan.entry_by_id(entry.detection_id) is None
         # detector-produced entries cannot be removed
@@ -224,7 +255,7 @@ class TestReviewSession:
         assert not session.remove_manual_entry("bogus-id")
 
     def test_apply_redacts_manual_marks(self, session: ReviewSession) -> None:
-        assert session.mark_text("Ramesh Kumar", "NAME")
+        assert session.mark_text("Ramesh Kumar", "NAME").added
         out_path, _count = session.apply()
         with fitz.open(out_path) as doc:
             text = doc[0].get_text()

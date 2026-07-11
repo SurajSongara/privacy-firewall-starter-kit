@@ -51,6 +51,8 @@ class MarkRequest(BaseModel):
     text: str
     label: str
     case_sensitive: bool = False
+    remember: bool = False
+    """Also remember the term for every document in the workspace."""
 
 
 class RemoveRequest(BaseModel):
@@ -103,6 +105,9 @@ def create_app(session: ReviewSession) -> FastAPI:
     @app.get("/api/plan")
     def plan() -> dict:  # type: ignore[type-arg]
         ensure_ready()
+        # Terms remembered in a sibling document since this session's
+        # pipeline ran surface on the next plan read (idempotent).
+        session.sync_remembered_terms()
         return session.summary()
 
     @app.get("/api/page/{page_number}")
@@ -135,21 +140,28 @@ def create_app(session: ReviewSession) -> FastAPI:
     def mark(request: MarkRequest) -> dict:  # type: ignore[type-arg]
         ensure_ready()
         try:
-            entries = session.mark_text(
+            result = session.mark_text(
+                request.text, request.label, case_sensitive=request.case_sensitive
+            )
+            remembered = request.remember and session.remember_text(
                 request.text, request.label, case_sensitive=request.case_sensitive
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {
-            "added": len(entries),
-            "entries": [session.entry_dict(e) for e in entries],
+            "added": len(result.added),
+            "skipped": result.skipped,
+            "remembered": remembered,
+            "entries": [session.entry_dict(e) for e in result.added],
             "counts": session.plan.counts(),
         }
 
     @app.post("/api/remove")
     def remove(request: RemoveRequest) -> dict:  # type: ignore[type-arg]
         ensure_ready()
-        if not session.remove_manual_entry(request.detection_id):
+        if not session.remove_manual_entry(request.detection_id) and not session.forget_term(
+            request.detection_id
+        ):
             raise HTTPException(status_code=404, detail="unknown or non-manual detection_id")
         return {"ok": True, "counts": session.plan.counts()}
 

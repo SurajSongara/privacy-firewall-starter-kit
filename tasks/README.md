@@ -38,7 +38,7 @@ Delivered:
 - `privacy-firewall doctor` CLI command
 - Regression benchmarks with synthetic PDFs + recall tests
 
-## Phase 3 — Precision & Review Pack (Planned)
+## Phase 3 — Precision & Review Pack (Complete ✅)
 
 The core gap: detection and decision are conflated — every detection becomes a redaction, but what counts as PII depends on the document and the sharing context. Phase 3 separates them (Detect → Decide → Review → Redact), fixes the known false positives, and adds a local review UI with engine pre-selections.
 
@@ -71,7 +71,7 @@ P010 (feedback memory) was deferred until the review UI had real usage; F004 un-
 
 Post-P009 work delivered outside the task tracker: Studio dashboard with multi-format ingestion (images/txt/md/docx → PDF), style-matched star redactions, layout-stable redaction (surviving line text no longer shifts), review UI overhaul (two-row header, zoom, view-result), partial-word drag selection with editable mark popup, and instance-scoped renderer bbox search (repeated-text stars stay styled, per-instance keep/redact honoured).
 
-## Phase 4 — Trust & Recall Pack (Planned)
+## Phase 4 — Trust & Recall Pack (Complete ✅)
 
 Close the gaps real usage exposed: honest UI feedback, the last known FP class, exact redaction geometry, and the two features that end repetitive manual marking.
 
@@ -79,11 +79,19 @@ Principles: Redaction boxes must be glyph-exact → Remembered marks are suggest
 
 | # | Task | Status |
 |---|------|--------|
-| F001 | Review UX Polish — honest mark feedback + overlapping-rect merge | ⏳ Pending |
-| F002 | Phone Precision — UTR/Ref-ID trap demotion (≥0.9 precision) | ⏳ Pending |
-| F003 | Char Geometry — rawdict per-char bboxes; exact sub-word redaction | ⏳ Pending |
-| F004 | Workspace Memory — remembered marks across documents (P010 scope) | ⏳ Pending |
-| F005 | Name Detection — deterministic NAME detector from document evidence | ⏳ Pending |
+| F001 | Review UX Polish — honest mark feedback + overlapping-rect merge | ✅ Complete |
+| F002 | Phone Precision — UTR/Ref-ID trap demotion (≥0.9 precision) | ✅ Complete |
+| F003 | Char Geometry — rawdict per-char bboxes; exact sub-word redaction | ✅ Complete |
+| F004 | Workspace Memory — remembered marks across documents (P010 scope) | ✅ Complete |
+| F005 | Name Detection — deterministic NAME detector from document evidence | ✅ Complete |
+
+Delivered:
+- `api/mark` reports added vs already-marked counts; UI toast no longer conflates them
+- Renderer merges overlapping same-type redaction rects (no more star-on-star)
+- PHONE precision 75% → 100% on the P004 benchmark (bare 10-digit numbers in UTR/Ref context hard-dropped; dialling prefixes keep the soft penalty)
+- Sub-word marks and drag selection snap to real glyph boundaries from `rawdict` (`cx` char boundaries in `/api/text`); OCR words keep the proportional fallback
+- `TermsStore` (`.privacy-firewall/terms.json`) — remembered marks suggested across all workspace documents, with keep-allowlist and workspace-wide forget
+- `NameDetector` — NAME candidates derived from email local parts, profile handles, and the title line; corroboration-based confidence, heuristic fusion tier
 
 ## Workflow
 
