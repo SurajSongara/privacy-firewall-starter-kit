@@ -19,6 +19,7 @@ from privacy_firewall.detectors import (
     DetectorRegistry,
     EmailDetector,
     IFSCDetector,
+    NameDetector,
     PANDetector,
     PhoneDetector,
     UpiDetector,
@@ -196,6 +197,7 @@ class ReviewSession:
             UpiDetector(),
             IFSCDetector(),
             AccountDetector(),
+            NameDetector(),
         ):
             registry.register(detector)
 
