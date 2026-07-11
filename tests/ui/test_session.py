@@ -56,6 +56,24 @@ class TestReviewSession:
         assert png1[:8] == b"\x89PNG\r\n\x1a\n"
         assert session.page_png(1) is png1
 
+    def test_page_png_cache_is_bounded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = tmp_path / "many.pdf"
+        doc = fitz.open()
+        for i in range(4):
+            page = doc.new_page()
+            page.insert_text((50, 100), f"page {i + 1}", fontsize=12)
+        doc.save(str(path))
+        doc.close()
+
+        monkeypatch.setattr(ReviewSession, "PAGE_CACHE_PAGES", 2)
+        session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"])
+        for n in range(1, 5):
+            session.page_png(n)
+        assert len(session._page_cache) == 2
+        assert set(session._page_cache) == {3, 4}  # LRU keeps the newest
+
     def test_apply_writes_redacted_pdf_and_plan(self, session: ReviewSession) -> None:
         out_path, count = session.apply()
         assert out_path.exists()
@@ -221,6 +239,58 @@ class TestReviewSession:
         entries = session.mark_text("Ramesh Kumar", "NAME", case_sensitive=True).added
         assert len(entries) == 1
         assert entries[0].detection.text == "Ramesh Kumar"
+
+    def test_page_words_dedupe_native_ocr_twins(self) -> None:
+        # Hybrid documents carry the same word twice at nearly identical
+        # coordinates (native + OCR reading); the text layer must not.
+        from privacy_firewall.ui.session import _dedupe_twin_words
+
+        words = [
+            {"text": "PAN", "x0": 41.3, "y0": 111.0, "x1": 54.8, "y1": 119.3},
+            {"text": "PAN", "x0": 40.0, "y0": 110.5, "x1": 56.5, "y1": 119.5},  # OCR twin
+            {"text": "PAN", "x0": 300.0, "y0": 500.0, "x1": 313.5, "y1": 508.3},  # elsewhere
+            {"text": "Name", "x0": 41.3, "y0": 111.0, "x1": 60.0, "y1": 119.3},  # diff text
+        ]
+        kept = _dedupe_twin_words(words)
+        assert len(kept) == 3
+        assert kept[0] == words[0]  # native (first) wins
+        assert words[1] not in kept
+
+    def test_mark_text_skips_native_ocr_twin_blocks(self, tmp_path: Path) -> None:
+        # Two blocks containing the same word at (nearly) the same spot —
+        # the hybrid-merge shape — must yield one entry, not two.
+        from privacy_firewall.engine.decision import ReviewPlan
+        from privacy_firewall.models.blocks import TextBlock
+        from privacy_firewall.models.document import Document, Page
+        from privacy_firewall.models.geometry import BoundingBox
+
+        path = tmp_path / "twin.pdf"
+        doc = fitz.open()
+        doc.new_page()
+        doc.save(str(path))
+        doc.close()
+
+        session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"], lazy=True)
+        blocks = [
+            TextBlock(
+                block_id=f"b{i}",
+                bbox=BoundingBox(x0=x0, y0=y0, x1=x0 + 40.0, y1=y0 + 10.0),
+                page_number=1,
+                confidence=1.0,
+                text="PAN ABCDE1234F",
+                spans=[],
+            )
+            for i, (x0, y0) in enumerate([(41.3, 111.0), (40.0, 110.5)])
+        ]
+        session._document = Document(
+            pages=[Page(page_number=1, width=612.0, height=792.0, blocks=blocks)]
+        )
+        session._plan = ReviewPlan(
+            source_path=str(path), source_sha256="test", policy_name="share-with-ai"
+        )
+        result = session.mark_text("ABCDE1234F", "PAN")
+        assert len(result.added) == 1
+        assert result.skipped == 1  # the OCR twin
 
     def test_mark_text_is_idempotent(self, session: ReviewSession) -> None:
         first = session.mark_text("Ramesh", "NAME")

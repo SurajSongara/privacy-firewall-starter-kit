@@ -72,6 +72,10 @@ def create_app(session: ReviewSession) -> FastAPI:
     """
     app = FastAPI(title="Privacy Firewall Review", docs_url=None, redoc_url=None)
     rerun_lock = threading.Lock()
+    # Sync endpoints run in a threadpool; every access to the mutable
+    # plan is serialised so concurrent mark/decide/apply calls can't
+    # corrupt the entries list mid-iteration.
+    plan_lock = threading.RLock()
 
     def ensure_ready() -> None:
         """Reject data requests until the pipeline has finished."""
@@ -102,13 +106,23 @@ def create_app(session: ReviewSession) -> FastAPI:
         threading.Thread(target=worker, daemon=True).start()
         return session.status_payload()
 
+    @app.get("/api/pages")
+    def pages() -> dict:  # type: ignore[type-arg]
+        # Deliberately no ensure_ready(): page geometry comes straight
+        # from the PDF so the UI can render pages during a long OCR run.
+        try:
+            return {"pages": session.page_dimensions()}
+        except Exception as exc:  # noqa: BLE001 - unreadable/corrupt file
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/plan")
     def plan() -> dict:  # type: ignore[type-arg]
         ensure_ready()
-        # Terms remembered in a sibling document since this session's
-        # pipeline ran surface on the next plan read (idempotent).
-        session.sync_remembered_terms()
-        return session.summary()
+        with plan_lock:
+            # Terms remembered in a sibling document since this session's
+            # pipeline ran surface on the next plan read (idempotent).
+            session.sync_remembered_terms()
+            return session.summary()
 
     @app.get("/api/page/{page_number}")
     def page_png(page_number: int) -> Response:
@@ -122,7 +136,8 @@ def create_app(session: ReviewSession) -> FastAPI:
     def preview_png(page_number: int) -> Response:
         ensure_ready()
         try:
-            png = session.preview_page_png(page_number)
+            with plan_lock:
+                png = session.preview_page_png(page_number)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return Response(content=png, media_type="image/png")
@@ -140,39 +155,42 @@ def create_app(session: ReviewSession) -> FastAPI:
     def mark(request: MarkRequest) -> dict:  # type: ignore[type-arg]
         ensure_ready()
         try:
-            result = session.mark_text(
-                request.text, request.label, case_sensitive=request.case_sensitive
-            )
-            remembered = request.remember and session.remember_text(
-                request.text, request.label, case_sensitive=request.case_sensitive
-            )
+            with plan_lock:
+                result = session.mark_text(
+                    request.text, request.label, case_sensitive=request.case_sensitive
+                )
+                remembered = request.remember and session.remember_text(
+                    request.text, request.label, case_sensitive=request.case_sensitive
+                )
+                return {
+                    "added": len(result.added),
+                    "skipped": result.skipped,
+                    "remembered": remembered,
+                    "entries": [session.entry_dict(e) for e in result.added],
+                    "counts": session.plan.counts(),
+                }
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return {
-            "added": len(result.added),
-            "skipped": result.skipped,
-            "remembered": remembered,
-            "entries": [session.entry_dict(e) for e in result.added],
-            "counts": session.plan.counts(),
-        }
 
     @app.post("/api/remove")
     def remove(request: RemoveRequest) -> dict:  # type: ignore[type-arg]
         ensure_ready()
-        if not session.remove_manual_entry(request.detection_id) and not session.forget_term(
-            request.detection_id
-        ):
-            raise HTTPException(status_code=404, detail="unknown or non-manual detection_id")
-        return {"ok": True, "counts": session.plan.counts()}
+        with plan_lock:
+            if not session.remove_manual_entry(request.detection_id) and not session.forget_term(
+                request.detection_id
+            ):
+                raise HTTPException(status_code=404, detail="unknown or non-manual detection_id")
+            return {"ok": True, "counts": session.plan.counts()}
 
     @app.post("/api/decision")
     def decision(request: DecisionRequest) -> dict:  # type: ignore[type-arg]
         ensure_ready()
         if request.decision not in (None, "redact", "keep"):
             raise HTTPException(status_code=422, detail="decision must be redact/keep/null")
-        if not session.set_decision(request.detection_id, request.decision):
-            raise HTTPException(status_code=404, detail="unknown detection_id")
-        return {"ok": True, "counts": session.plan.counts()}
+        with plan_lock:
+            if not session.set_decision(request.detection_id, request.decision):
+                raise HTTPException(status_code=404, detail="unknown detection_id")
+            return {"ok": True, "counts": session.plan.counts()}
 
     @app.post("/api/apply")
     def apply(request: ApplyRequest) -> dict:  # type: ignore[type-arg]
@@ -187,7 +205,8 @@ def create_app(session: ReviewSession) -> FastAPI:
                     detail="redaction_type must be replace/black_bar/highlight",
                 ) from exc
         output = Path(request.output_path) if request.output_path else None
-        out_path, count = session.apply(output, redaction_type=redaction_type)
+        with plan_lock:
+            out_path, count = session.apply(output, redaction_type=redaction_type)
         return {
             "output_path": str(out_path),
             "redactions": count,
@@ -197,7 +216,8 @@ def create_app(session: ReviewSession) -> FastAPI:
     @app.post("/api/save")
     def save() -> dict:  # type: ignore[type-arg]
         ensure_ready()
-        return {"plan_path": str(session.save_plan())}
+        with plan_lock:
+            return {"plan_path": str(session.save_plan())}
 
     @app.get("/api/output")
     def output() -> FileResponse:

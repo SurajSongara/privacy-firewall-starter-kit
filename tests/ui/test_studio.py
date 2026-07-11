@@ -77,6 +77,31 @@ class TestStudioDashboard:
         )
         assert response.status_code == 422
 
+    def test_upload_rejects_oversized_file(
+        self, studio: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from privacy_firewall.ui import studio as studio_module
+
+        monkeypatch.setattr(studio_module, "MAX_UPLOAD_BYTES", 1024)
+        response = studio.post(
+            "/api/upload",
+            files={"file": ("big.pdf", b"%PDF" + b"x" * 2048, "application/pdf")},
+        )
+        assert response.status_code == 413
+        assert "upload limit" in response.text
+
+    def test_upload_rejects_empty_file(self, studio: TestClient) -> None:
+        response = studio.post("/api/upload", files={"file": ("empty.pdf", b"", "application/pdf")})
+        assert response.status_code == 422
+        assert "empty" in response.text
+
+    def test_documents_report_pipeline_status(self, studio: TestClient) -> None:
+        docs = studio.get("/api/documents").json()["documents"]
+        assert docs
+        for d in docs:
+            assert "status" in d
+            assert "error" in d
+
 
 def _wait_ready(studio: TestClient, doc_id: str, timeout: float = 30.0) -> None:
     """Poll a mounted review's status until the pipeline is ready."""

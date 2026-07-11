@@ -36,18 +36,33 @@ PAGE_HTML = r"""<!doctype html>
   .hrow.tools .btn, .hrow.tools select.ctl { padding: 5px 12px; font-size: 12.5px; }
   .hrow.tools .toolgroup button { padding: 5px 10px; }
   /* Controls never shrink or clip — the row wraps instead; only the
-     file-path meta is allowed to compress (and hides when tight). */
-  .hrow > :not(.meta) { flex-shrink: 0; }
-  @media (max-width: 1100px) { header .meta { display: none; } }
+     file-path chip is allowed to compress (and hides when tight). */
+  .hrow > :not(.pathchip) { flex-shrink: 0; }
+  @media (max-width: 1000px) { header .pathchip { display: none !important; } }
   .legend { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .logo { display: flex; align-items: center; gap: 9px; }
   .logo svg { width: 24px; height: 24px; flex-shrink: 0; }
   .logo .name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .logo .sub { font-size: 11px; color: var(--muted); margin-top: -2px; }
-  header .meta {
-    color: var(--muted); font-size: 12px; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 320px;
+  .pathchip {
+    display: flex; align-items: center; gap: 2px; min-width: 0; max-width: 480px;
+    background: #f8fafc; border: 1px solid var(--line); border-radius: 8px;
+    padding: 3px 4px 3px 10px; color: var(--muted);
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
   }
+  .pathchip .p {
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    min-width: 0; cursor: pointer;
+  }
+  .pathchip .p:hover { color: var(--text); }
+  .pathchip button {
+    border: none; background: none; cursor: pointer; color: var(--muted);
+    padding: 3px 6px; border-radius: 6px; display: flex; align-items: center;
+    flex-shrink: 0;
+  }
+  .pathchip button:hover { background: #e2e8f0; color: var(--text); }
+  .pathchip button svg { width: 13px; height: 13px; }
+  .runmeta { color: var(--muted); font-size: 12px; white-space: nowrap; }
   header .spacer { flex: 1; }
   .pill {
     padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
@@ -104,6 +119,18 @@ PAGE_HTML = r"""<!doctype html>
     display: none; padding: 8px 20px; background: #fdf4ff; color: #86198f;
     border-bottom: 1px solid #f5d0fe; font-weight: 600; font-size: 13px;
   }
+  #progress-banner {
+    display: none; align-items: center; gap: 10px; padding: 8px 20px;
+    background: #eef2ff; color: #3730a3; border-bottom: 1px solid #c7d2fe;
+    font-weight: 600; font-size: 13px;
+  }
+  #progress-banner .spin {
+    width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid #c7d2fe; border-top-color: var(--accent);
+    animation: spin .9s linear infinite;
+  }
+  #progress-banner.err { background: #fef2f2; color: #b91c1c; border-bottom-color: #fecaca; }
+  #progress-banner.err .spin { display: none; }
   .hint {
     display: flex; align-items: center; gap: 8px; padding: 8px 20px;
     background: #eef2ff; color: #3730a3; border-bottom: 1px solid #e0e7ff; font-size: 12.5px;
@@ -302,7 +329,15 @@ PAGE_HTML = r"""<!doctype html>
       <div><div class="name">Privacy Firewall</div><div class="sub">Redaction review</div></div>
     </div>
     <button class="btn" id="home-btn" style="display:none" title="Back to dashboard">&larr; Dashboard</button>
-    <span class="meta" id="meta"></span>
+    <span class="pathchip" id="path-chip" style="display:none">
+      <span class="p" id="src-path"></span>
+      <button id="copy-path" title="Copy full file path" aria-label="Copy file path">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/>
+          <path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5v5A1.5 1.5 0 0 0 4 10h1.5"/>
+        </svg>
+      </button>
+    </span>
     <span class="spacer"></span>
     <span class="pill redact" id="count-redact">0</span>
     <span class="pill ask" id="count-ask">0</span>
@@ -328,6 +363,7 @@ PAGE_HTML = r"""<!doctype html>
       <option value="highlight">Highlight only</option>
     </select>
     <button class="btn" id="preview-btn">Preview</button>
+    <span class="runmeta" id="run-meta"></span>
     <span class="legend"><span class="swatch" style="background:rgba(5,150,105,.7)"></span>redacted
       <span class="swatch" style="background:rgba(217,119,6,.7)"></span>needs review
       <span class="swatch" style="background:rgba(100,116,139,.5)"></span>kept</span>
@@ -335,6 +371,7 @@ PAGE_HTML = r"""<!doctype html>
 </header>
 <div id="banner"></div>
 <div id="preview-banner">Previewing redacted output — this is exactly what the exported PDF will look like.</div>
+<div id="progress-banner"><span class="spin"></span><span id="progress-text">Processing…</span></div>
 <div class="hint">
   <b>Tip:</b> drag a box over any text on a page — even part of a word — to mark every instance of it as PII.
   Shortcuts: <kbd>n</kbd>/<kbd>p</kbd> next/prev needs-review, <kbd>r</kbd> redact, <kbd>k</kbd> keep.
@@ -398,6 +435,8 @@ PAGE_HTML = r"""<!doctype html>
 <script>
 "use strict";
 let PLAN = null;
+let PAGES = null;          // page dims: /api/pages before ready, PLAN.pages after
+let earlyView = false;     // pages shown while the pipeline still runs
 const WORDS = {};          // page_number -> word list from /api/text
 const LAYOUT = {};         // page_number -> [{el, x, y, w, h}] in layer px
 let pendingSelection = null;
@@ -447,6 +486,24 @@ const STAGE_LABELS = {
   detecting: "Running PII detectors…",
 };
 
+async function showEarlyPages() {
+  // During a long pipeline run (OCR on a large scan can take minutes),
+  // show the page images straight away — geometry comes from the PDF
+  // itself, so browsing works while detection is still in progress.
+  if (earlyView || PAGES) return;
+  try {
+    const data = await api("api/pages");
+    if (!data.pages || !data.pages.length) return;
+    PAGES = data.pages;
+    earlyView = true;
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("progress-banner").style.display = "flex";
+    initPages();
+  } catch (err) {
+    // PDF not readable (yet) — keep the full-screen loader.
+  }
+}
+
 async function boot() {
   let status;
   try {
@@ -459,18 +516,33 @@ async function boot() {
   const elapsed = Math.round((Date.now() - bootStart) / 1000);
   document.getElementById("load-elapsed").textContent = elapsed + "s elapsed";
   if (status.status === "error") {
+    if (earlyView) {
+      const banner = document.getElementById("progress-banner");
+      banner.style.display = "flex";
+      banner.classList.add("err");
+      document.getElementById("progress-text").textContent =
+        "Pipeline failed: " + status.detail;
+      return;
+    }
     document.getElementById("load-spinner").style.display = "none";
     stage.className = "err";
     stage.textContent = "Pipeline failed: " + status.detail;
     return;
   }
   if (status.status !== "ready") {
-    stage.textContent = STAGE_LABELS[status.status] || (status.status + "…");
+    const label = STAGE_LABELS[status.status] || (status.status + "…");
+    stage.textContent = label;
+    document.getElementById("progress-text").textContent =
+      label + " (" + elapsed + "s elapsed) — you can browse the pages meanwhile.";
+    await showEarlyPages();
     setTimeout(boot, 800);
     return;
   }
   PLAN = await api("api/plan");
+  PAGES = PLAN.pages;
+  earlyView = false;
   document.getElementById("loading").style.display = "none";
+  document.getElementById("progress-banner").style.display = "none";
   if (PLAN.workspace_terms) {
     document.getElementById("search-remember-row").style.display = "";
     document.getElementById("remember-row").style.display = "";
@@ -493,14 +565,47 @@ function render() {
   for (const k of ["redact", "ask", "keep"]) {
     document.getElementById("count-" + k).textContent = counts[k] + " " + k;
   }
-  document.getElementById("meta").textContent =
-    PLAN.source + " · policy: " + PLAN.policy + " · " + PLAN.pipeline;
+  renderSourcePath();
   document.getElementById("apply").disabled = PLAN.entries.length === 0;
   renderEmptyNote();
   renderFilterTabs(counts);
   renderSidebar();
   renderOverlays();
 }
+
+function middleEllipsis(s, head, tail) {
+  if (s.length <= head + tail + 1) return s;
+  return s.slice(0, head) + "…" + s.slice(-tail);
+}
+
+async function copySourcePath() {
+  try {
+    await navigator.clipboard.writeText(PLAN.source);
+  } catch (err) {
+    const ta = document.createElement("textarea");
+    ta.value = PLAN.source;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  toast("File path copied to clipboard.");
+}
+
+function renderSourcePath() {
+  const chip = document.getElementById("path-chip");
+  chip.style.display = "flex";
+  chip.title = PLAN.source + "\n(click to copy the full path)";
+  document.getElementById("src-path").textContent = middleEllipsis(PLAN.source, 10, 34);
+  document.getElementById("run-meta").textContent =
+    "policy: " + PLAN.policy + " · " + PLAN.pipeline;
+}
+document.getElementById("src-path").addEventListener("click", () => {
+  if (PLAN) copySourcePath();
+});
+document.getElementById("copy-path").addEventListener("click", () => {
+  if (PLAN) copySourcePath();
+});
 
 function renderEmptyNote() {
   const existing = document.querySelector(".empty-note");
@@ -605,10 +710,10 @@ function initPages() {
   Object.keys(LAYOUT).forEach(k => delete LAYOUT[k]);
   ZOOM = Math.min(1, fitZoom());   // start at 100% or fit-width, whichever is smaller
   document.getElementById("zoom-val").textContent = Math.round(ZOOM * 100) + "%";
-  PLAN.pages.forEach(p => {
+  (PAGES || []).forEach(p => {
     const label = document.createElement("div");
     label.className = "page-label";
-    label.textContent = "Page " + p.page_number + " / " + PLAN.pages.length;
+    label.textContent = "Page " + p.page_number + " / " + PAGES.length;
     label.style.width = (BASE_WIDTH * ZOOM) + "px";
     const wrap = document.createElement("div");
     wrap.className = "page-wrap";
@@ -639,7 +744,7 @@ function pageSrc(n) {
 function renderOverlays() {
   document.querySelectorAll(".page-wrap").forEach(wrap => {
     wrap.querySelectorAll(".overlay").forEach(n => n.remove());
-    const p = PLAN.pages.find(p => p.page_number === Number(wrap.dataset.page));
+    const p = (PAGES || []).find(p => p.page_number === Number(wrap.dataset.page));
     if (!p) return;
     PLAN.entries.filter(e => e.page_number === p.page_number).forEach(e => {
       const o = document.createElement("div");
@@ -710,6 +815,7 @@ document.addEventListener("keydown", e => {
 /* ---------- selectable text layer ---------- */
 
 async function buildTextLayer(p, wrap) {
+  if (!PLAN) return;   // early view: page images only, no text layer yet
   if (!WORDS[p.page_number]) {
     try {
       WORDS[p.page_number] = (await api("api/text/" + p.page_number)).words;
@@ -754,7 +860,7 @@ function layoutTextLayer(p, wrap) {
 
 function relayoutAll() {
   document.querySelectorAll(".page-wrap").forEach(wrap => {
-    const p = PLAN.pages.find(p => p.page_number === Number(wrap.dataset.page));
+    const p = (PAGES || []).find(p => p.page_number === Number(wrap.dataset.page));
     if (p) layoutTextLayer(p, wrap);
   });
 }
@@ -793,16 +899,16 @@ function observePages() {
       if (en.isIntersecting) {
         currentPage = Number(en.target.dataset.page);
         document.getElementById("page-ind").textContent =
-          currentPage + "/" + PLAN.pages.length;
+          currentPage + "/" + PAGES.length;
       }
     });
   }, {rootMargin: "-45% 0px -45% 0px"});
   document.querySelectorAll(".page-wrap").forEach(w => pageObserver.observe(w));
-  document.getElementById("page-ind").textContent = "1/" + PLAN.pages.length;
+  document.getElementById("page-ind").textContent = "1/" + PAGES.length;
 }
 
 function gotoPage(n) {
-  const clamped = Math.min(PLAN.pages.length, Math.max(1, n));
+  const clamped = Math.min((PAGES || []).length || 1, Math.max(1, n));
   const wrap = document.querySelector(`.page-wrap[data-page="${clamped}"]`);
   if (wrap) wrap.scrollIntoView({block: "start", behavior: "smooth"});
 }
@@ -1065,7 +1171,9 @@ async function rerunWithOcr() {
 }
 
 /* ---------- dashboard link (studio mode only) ---------- */
-if (location.search.includes("studio")) {
+// Mounted under the studio the path is /review/{doc_id}/ — detect that
+// too, so the button survives navigation that drops the ?studio query.
+if (location.search.includes("studio") || location.pathname.includes("/review/")) {
   const hb = document.getElementById("home-btn");
   hb.style.display = "";
   hb.addEventListener("click", () => { window.location.href = "/"; });
@@ -1183,6 +1291,8 @@ STUDIO_HTML = r"""<!doctype html>
   .doc .row { display: flex; align-items: center; gap: 8px; }
   .doc .tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
     background: #ecfdf5; color: #065f46; }
+  .doc .tag.busy { background: #eef2ff; color: #3730a3; }
+  .doc .tag.fail { background: #fef2f2; color: #b91c1c; }
   .doc .actions { display: flex; gap: 8px; margin-top: 4px; }
   .doc .actions .btn { flex: 1; padding: 7px 0; text-align: center; }
   .empty { color: var(--muted); text-align: center; padding: 26px; border: 1px dashed #cbd5e1;
@@ -1253,6 +1363,14 @@ function toast(msg, kind) {
   setTimeout(() => el.remove(), 4200);
 }
 
+function statusTag(d) {
+  if (d.status === "ready" || !d.status) return "";
+  if (d.status === "error") {
+    return '<span class="tag fail" title="' + esc(d.error || "") + '">Failed</span>';
+  }
+  return '<span class="tag busy">Processing…</span>';
+}
+
 async function uploadFiles(fileList) {
   for (const f of fileList) {
     const fd = new FormData();
@@ -1300,7 +1418,7 @@ async function refresh() {
           <div class="meta">${fmtSize(d.size)} · ${fmtDate(d.modified)}</div>
         </div>
       </div>
-      <div class="row">${d.has_plan ? '<span class="tag">Resume available</span>' : ''}</div>
+      <div class="row">${statusTag(d)}${d.has_plan ? '<span class="tag">Resume available</span>' : ''}</div>
       <div class="actions">
         <button class="btn primary" data-open="${esc(d.id)}">Open</button>
       </div>`;
