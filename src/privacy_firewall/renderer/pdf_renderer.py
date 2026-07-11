@@ -101,8 +101,10 @@ class PDFRenderer:
         are re-inserted at their exact original positions afterwards.
         HIGHLIGHT redactions use ``draw_rect`` (visual-only).
 
-        Uses PyMuPDF's ``search_for`` to find the exact text bbox for
-        precise redaction, falling back to the detection bbox if not found.
+        Each redaction's bbox is refined via ``search_for`` clipped to
+        its own region (falling back to the detection bbox if not
+        found), and identical rects from overlapping detections are
+        deduplicated so no region is redacted twice.
 
         Args:
             doc: An open PyMuPDF document.
@@ -115,18 +117,47 @@ class PDFRenderer:
                 continue
 
             jobs: list[tuple[Any, RedactionType, str]] = []
+            seen: set[tuple[float, float, float, float]] = set()
             for redaction in page_redactions:
-                # Try to find the exact text bbox using PyMuPDF's search
-                search_results = page.search_for(redaction.detection.text)
-                rects = search_results or [
-                    fitz.Rect(
-                        redaction.bbox.x0,
-                        redaction.bbox.y0,
-                        redaction.bbox.x1,
-                        redaction.bbox.y1,
-                    )
-                ]
+                bbox_rect = fitz.Rect(
+                    redaction.bbox.x0,
+                    redaction.bbox.y0,
+                    redaction.bbox.x1,
+                    redaction.bbox.y1,
+                )
+                # Refine the bbox via search, but only inside this
+                # redaction's own region: the plan carries one redaction
+                # per instance, so a page-wide search of repeated text
+                # (e.g. a marked substring) would return every twin and
+                # the duplicate jobs would repaint their background fill
+                # over the already-drawn styled stars.
+                clip = fitz.Rect(
+                    bbox_rect.x0 - 2, bbox_rect.y0 - 2, bbox_rect.x1 + 2, bbox_rect.y1 + 2
+                )
+                rects = page.search_for(redaction.detection.text, clip=clip)
+                if not rects:
+                    # Imprecise bbox (e.g. OCR geometry offset from the
+                    # native text layer): search the whole page but keep
+                    # only the match nearest this detection's bbox.
+                    matches = page.search_for(redaction.detection.text)
+                    if matches:
+                        cx = (bbox_rect.x0 + bbox_rect.x1) / 2
+                        cy = (bbox_rect.y0 + bbox_rect.y1) / 2
+                        rects = [
+                            min(
+                                matches,
+                                key=lambda r: (
+                                    ((r.x0 + r.x1) / 2 - cx) ** 2 + ((r.y0 + r.y1) / 2 - cy) ** 2
+                                ),
+                            )
+                        ]
+                    else:
+                        rects = [bbox_rect]
                 for rect in rects:
+                    key = tuple(round(v, 1) for v in (rect.x0, rect.y0, rect.x1, rect.y1))
+                    if key in seen:
+                        continue  # two detections of the same instance
+                    seen.add(key)
                     if redaction.redaction_type == RedactionType.HIGHLIGHT:
                         page.draw_rect(
                             rect,
