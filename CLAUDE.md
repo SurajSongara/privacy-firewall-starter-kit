@@ -83,6 +83,6 @@ Module map (see `AGENTS.md` for the full per-file reference — it is the source
 ## Notes for future sessions
 
 - `AGENTS.md` is a hand-maintained deep-dive reference generated from the source; consult it before changing architecture but assume drift is possible — verify against code.
-- `.ai/CURRENT_STATE.md` tracks phase status; `tasks/` contains one markdown file per outstanding task (Phase 2 “Robustness Pack” R001–R010, most complete). Update `CURRENT_STATE.md` when finishing a task.
-- Known false positives on `TestFiles/statement1-5.pdf`: Aadhaar detector catches 12-digit UPI txn refs, Phone detector catches 10-digit bank refs, Email detector catches OCR artifacts like `30524@sbi.coin`. Aadhaar Verhoeff + structural filtering in ref strings is the pending fix.
+- `.ai/CURRENT_STATE.md` tracks phase status; `tasks/` contains one markdown file per task (Phases 1–3 complete; Phase 4 “Trust & Recall Pack” F001–F005 is pending). Update `CURRENT_STATE.md` when finishing a task.
+- Known false positives on `TestFiles/statement1-5.pdf`: the Aadhaar (Verhoeff + first-digit) and Email (TLD allowlist) FP classes were fixed in P003; the remaining one is Phone catching 10-digit UTR/bank refs (75% precision) — pending as `tasks/F002_PHONE_PRECISION.md`.
 - `paddlepaddle` has no wheel for Python 3.14 — `PaddleOCRAdapter` will fail to register; Tesseract remains the working default.
