@@ -39,13 +39,14 @@ from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.detection import Detection
 from privacy_firewall.models.document import Document
 from privacy_firewall.models.geometry import BoundingBox, Span
-from privacy_firewall.policy.models import Policy
+from privacy_firewall.policy.models import Policy, PolicyAction
 from privacy_firewall.renderer.page_images import (
     DEFAULT_DPI,
     render_page_image,
     render_page_image_bytes,
 )
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
+from privacy_firewall.ui.terms import TermsStore
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,7 @@ class ReviewSession:
         ocr_provider: str | None = None,
         dpi: int = DEFAULT_DPI,
         lazy: bool = False,
+        terms_store: TermsStore | None = None,
     ) -> None:
         """Set up the session and (unless *lazy*) run the pipeline.
 
@@ -86,6 +88,8 @@ class ReviewSession:
             dpi: Page-image render resolution.
             lazy: Skip the pipeline; the caller invokes :meth:`run` later
                 (e.g. in a background thread while the server starts).
+            terms_store: Workspace terms remembered across documents;
+                their instances are pre-suggested (never pre-decided).
         """
         self.pdf_path = Path(pdf_path)
         self.policy = policy
@@ -93,6 +97,8 @@ class ReviewSession:
         self.force_ocr = force_ocr
         self.auto = auto
         self.ocr_provider = ocr_provider
+        self.terms_store = terms_store
+        self._applied_term_keys: set[tuple[str, str]] = set()
         self._page_cache: dict[int, bytes] = {}
         self._char_words_cache: dict[int, dict[str, list[dict[str, Any]]]] = {}
         self._preview_pdf: bytes | None = None
@@ -210,6 +216,8 @@ class ReviewSession:
 
         self._document = document
         self._plan = plan
+        self._applied_term_keys.clear()
+        self.sync_remembered_terms()
         self.status = "ready"
 
     def _set_stage(self, stage: str) -> None:
@@ -270,6 +278,7 @@ class ReviewSession:
                 "decisions": self.restored_decisions,
                 "manual": self.restored_manual,
             },
+            "workspace_terms": self.terms_store is not None,
             "pages": [
                 {"page_number": p.page_number, "width": p.width, "height": p.height}
                 for p in self.document.pages
@@ -368,6 +377,116 @@ class ReviewSession:
         Raises:
             ValueError: If *text* or *label* is blank.
         """
+        return self._mark_instances(
+            text,
+            label,
+            case_sensitive=case_sensitive,
+            detector_name="manual",
+            detection_reason="marked as PII by the reviewer",
+            suggested=SuggestedAction.REDACT,
+            suggestion_reason="manually marked during review",
+            decision=ReviewDecision.REDACT,
+        )
+
+    def remember_text(self, text: str, label: str, *, case_sensitive: bool = False) -> bool:
+        """Add a term to the workspace store (no-op without a store).
+
+        Returns:
+            ``True`` if the term was newly remembered.
+        """
+        if self.terms_store is None:
+            return False
+        return self.terms_store.add(
+            text,
+            "_".join(label.split()).upper(),
+            case_sensitive=case_sensitive,
+            added_from=self.pdf_path.name,
+        )
+
+    def sync_remembered_terms(self) -> int:
+        """Apply workspace terms not yet suggested in this session.
+
+        Each active term's instances are added like :meth:`mark_text`
+        but with detector name ``"remembered"``, the *policy's* action
+        as the suggestion, and **no** decision — remembered terms are
+        suggestions the reviewer confirms. Idempotent; safe to call on
+        every plan read so terms remembered in one document surface in
+        the others without a restart.
+
+        Returns:
+            The number of entries added by this call.
+        """
+        if self.terms_store is None or self._plan is None:
+            return 0
+        added = 0
+        suggested_for = {
+            PolicyAction.REDACT: SuggestedAction.REDACT,
+            PolicyAction.KEEP: SuggestedAction.KEEP,
+            PolicyAction.ASK: SuggestedAction.ASK,
+        }
+        for term in self.terms_store.active_terms():
+            if term.key in self._applied_term_keys:
+                continue
+            self._applied_term_keys.add(term.key)
+            origin = f" (from {term.added_from})" if term.added_from else ""
+            result = self._mark_instances(
+                term.text,
+                term.label,
+                case_sensitive=term.case_sensitive,
+                detector_name="remembered",
+                detection_reason=f"remembered workspace term{origin}",
+                suggested=suggested_for[self.policy.type_policy(term.label).action],
+                suggestion_reason="suggested from workspace memory",
+                decision=None,
+            )
+            added += len(result.added)
+        return added
+
+    def forget_term(self, detection_id: str) -> bool:
+        """Forget the workspace term behind a remembered entry.
+
+        Removes the term from the store and every entry it produced in
+        this session (the term would otherwise resurface on the next
+        sync).
+
+        Args:
+            detection_id: Id of any entry the term produced.
+
+        Returns:
+            ``True`` if the entry was a remembered one and was removed.
+        """
+        entry = self.plan.entry_by_id(detection_id)
+        if entry is None or entry.detection.detector_name != "remembered":
+            return False
+        text = entry.detection.text
+        label = entry.detection.detection_type
+        key = (text.casefold(), label)
+        self.plan.entries = [
+            e
+            for e in self.plan.entries
+            if not (
+                e.detection.detector_name == "remembered"
+                and (e.detection.text.casefold(), e.detection.detection_type) == key
+            )
+        ]
+        self._applied_term_keys.discard(key)
+        if self.terms_store is not None:
+            self.terms_store.remove(text, label)
+        return True
+
+    def _mark_instances(
+        self,
+        text: str,
+        label: str,
+        *,
+        case_sensitive: bool,
+        detector_name: str,
+        detection_reason: str,
+        suggested: SuggestedAction,
+        suggestion_reason: str,
+        decision: ReviewDecision | None,
+    ) -> MarkResult:
+        """Add one entry per instance of *text* in the document."""
         tokens = text.split()
         if not tokens:
             msg = "text to mark must not be blank"
@@ -397,7 +516,7 @@ class ReviewSession:
                 page_offset += len(block.text) + 1
                 for match in pattern.finditer(block.text):
                     detection = Detection(
-                        detector_name="manual",
+                        detector_name=detector_name,
                         detection_type=normalized_label,
                         text=match.group(),
                         span=Span(start=base + match.start(), end=base + match.end()),
@@ -406,7 +525,7 @@ class ReviewSession:
                         ),
                         page_number=page.page_number,
                         confidence=1.0,
-                        reasons=("marked as PII by the reviewer",),
+                        reasons=(detection_reason,),
                     )
                     if detection.detection_id in known_ids:
                         skipped += 1
@@ -414,9 +533,9 @@ class ReviewSession:
                     known_ids.add(detection.detection_id)
                     entry = ReviewEntry(
                         detection=detection,
-                        suggested_action=SuggestedAction.REDACT,
-                        suggestion_reasons=("manually marked during review",),
-                        decision=ReviewDecision.REDACT,
+                        suggested_action=suggested,
+                        suggestion_reasons=(suggestion_reason,),
+                        decision=decision,
                     )
                     self.plan.entries.append(entry)
                     added.append(entry)
@@ -436,7 +555,8 @@ class ReviewSession:
 
         Only entries created by :meth:`mark_text` can be removed —
         detector-produced entries are kept as the audit trail (use a
-        *keep* decision to exclude them instead).
+        *keep* decision to exclude them instead). For entries produced
+        by a workspace term, use :meth:`forget_term`.
 
         Args:
             detection_id: Id of the manual entry to remove.

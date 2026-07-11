@@ -37,6 +37,7 @@ from privacy_firewall.parsers.converters import (
 from privacy_firewall.ui.html import STUDIO_HTML
 from privacy_firewall.ui.server import create_app
 from privacy_firewall.ui.session import ReviewSession
+from privacy_firewall.ui.terms import TermsStore
 
 
 def _slugify(name: str) -> str:
@@ -102,6 +103,7 @@ def create_studio_app(workspace: Path, policy_name: str = DEFAULT_POLICY_NAME) -
     workspace = Path(workspace)
     workspace.mkdir(parents=True, exist_ok=True)
     policy = get_policy(policy_name)
+    terms_store = TermsStore.for_workspace(workspace)
 
     app = FastAPI(title="Privacy Firewall Studio", docs_url=None, redoc_url=None)
     sessions: dict[str, ReviewSession] = {}
@@ -135,7 +137,7 @@ def create_studio_app(workspace: Path, policy_name: str = DEFAULT_POLICY_NAME) -
 
             # auto=True lets diagnostics route image-only documents
             # (scans, converted photos) through OCR.
-            session = ReviewSession(pdf_path, policy, lazy=True, auto=True)
+            session = ReviewSession(pdf_path, policy, lazy=True, auto=True, terms_store=terms_store)
             sub = create_app(session)
 
             def worker() -> None:
@@ -179,7 +181,7 @@ def create_studio_app(workspace: Path, policy_name: str = DEFAULT_POLICY_NAME) -
                     "has_plan": sessions[doc_id].plan_file_path.exists(),
                 }
             )
-        return {"documents": items}
+        return {"documents": items, "terms": len(terms_store.active_terms())}
 
     @app.post("/api/upload")
     async def upload(file: UploadFile = File(...)) -> dict[str, Any]:
