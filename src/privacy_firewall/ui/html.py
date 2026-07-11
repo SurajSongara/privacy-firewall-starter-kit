@@ -36,20 +36,33 @@ PAGE_HTML = r"""<!doctype html>
   .hrow.tools .btn, .hrow.tools select.ctl { padding: 5px 12px; font-size: 12.5px; }
   .hrow.tools .toolgroup button { padding: 5px 10px; }
   /* Controls never shrink or clip — the row wraps instead; only the
-     file-path meta is allowed to compress (and hides when tight). */
-  .hrow > :not(.meta) { flex-shrink: 0; }
-  @media (max-width: 1100px) { header .meta { display: none; } }
+     file-path chip is allowed to compress (and hides when tight). */
+  .hrow > :not(.pathchip) { flex-shrink: 0; }
+  @media (max-width: 1000px) { header .pathchip { display: none !important; } }
   .legend { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .logo { display: flex; align-items: center; gap: 9px; }
   .logo svg { width: 24px; height: 24px; flex-shrink: 0; }
   .logo .name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .logo .sub { font-size: 11px; color: var(--muted); margin-top: -2px; }
-  header .meta {
-    color: var(--muted); font-size: 12px; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 380px;
+  .pathchip {
+    display: flex; align-items: center; gap: 2px; min-width: 0; max-width: 480px;
+    background: #f8fafc; border: 1px solid var(--line); border-radius: 8px;
+    padding: 3px 4px 3px 10px; color: var(--muted);
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
   }
-  header .meta .path { cursor: pointer; }
-  header .meta .path:hover { color: var(--text); text-decoration: underline dotted; }
+  .pathchip .p {
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    min-width: 0; cursor: pointer;
+  }
+  .pathchip .p:hover { color: var(--text); }
+  .pathchip button {
+    border: none; background: none; cursor: pointer; color: var(--muted);
+    padding: 3px 6px; border-radius: 6px; display: flex; align-items: center;
+    flex-shrink: 0;
+  }
+  .pathchip button:hover { background: #e2e8f0; color: var(--text); }
+  .pathchip button svg { width: 13px; height: 13px; }
+  .runmeta { color: var(--muted); font-size: 12px; white-space: nowrap; }
   header .spacer { flex: 1; }
   .pill {
     padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
@@ -316,7 +329,15 @@ PAGE_HTML = r"""<!doctype html>
       <div><div class="name">Privacy Firewall</div><div class="sub">Redaction review</div></div>
     </div>
     <button class="btn" id="home-btn" style="display:none" title="Back to dashboard">&larr; Dashboard</button>
-    <span class="meta" id="meta"></span>
+    <span class="pathchip" id="path-chip" style="display:none">
+      <span class="p" id="src-path"></span>
+      <button id="copy-path" title="Copy full file path" aria-label="Copy file path">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/>
+          <path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5v5A1.5 1.5 0 0 0 4 10h1.5"/>
+        </svg>
+      </button>
+    </span>
     <span class="spacer"></span>
     <span class="pill redact" id="count-redact">0</span>
     <span class="pill ask" id="count-ask">0</span>
@@ -342,6 +363,7 @@ PAGE_HTML = r"""<!doctype html>
       <option value="highlight">Highlight only</option>
     </select>
     <button class="btn" id="preview-btn">Preview</button>
+    <span class="runmeta" id="run-meta"></span>
     <span class="legend"><span class="swatch" style="background:rgba(5,150,105,.7)"></span>redacted
       <span class="swatch" style="background:rgba(217,119,6,.7)"></span>needs review
       <span class="swatch" style="background:rgba(100,116,139,.5)"></span>kept</span>
@@ -571,17 +593,19 @@ async function copySourcePath() {
 }
 
 function renderSourcePath() {
-  const meta = document.getElementById("meta");
-  meta.innerHTML = "";
-  const path = document.createElement("span");
-  path.className = "path";
-  path.textContent = middleEllipsis(PLAN.source, 12, 26);
-  path.title = PLAN.source + "\n(click to copy the full path)";
-  path.addEventListener("click", copySourcePath);
-  meta.appendChild(path);
-  meta.appendChild(document.createTextNode(
-    " · policy: " + PLAN.policy + " · " + PLAN.pipeline));
+  const chip = document.getElementById("path-chip");
+  chip.style.display = "flex";
+  chip.title = PLAN.source + "\n(click to copy the full path)";
+  document.getElementById("src-path").textContent = middleEllipsis(PLAN.source, 10, 34);
+  document.getElementById("run-meta").textContent =
+    "policy: " + PLAN.policy + " · " + PLAN.pipeline;
 }
+document.getElementById("src-path").addEventListener("click", () => {
+  if (PLAN) copySourcePath();
+});
+document.getElementById("copy-path").addEventListener("click", () => {
+  if (PLAN) copySourcePath();
+});
 
 function renderEmptyNote() {
   const existing = document.querySelector(".empty-note");
