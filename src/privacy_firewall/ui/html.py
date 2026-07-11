@@ -22,17 +22,24 @@ PAGE_HTML = r"""<!doctype html>
   }
   code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; }
 
-  /* ---------- header ---------- */
+  /* ---------- header: row 1 = navigation/actions, row 2 = PDF tools ---------- */
   header {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 20px;
-    background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+    background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 30;
   }
+  .hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 20px; }
+  .hrow.tools {
+    border-top: 1px solid #eef1f6; background: rgba(248,250,252,.85);
+    padding: 5px 20px;
+  }
+  .hrow.tools .btn, .hrow.tools select.ctl { padding: 5px 12px; font-size: 12.5px; }
+  .hrow.tools .toolgroup button { padding: 5px 10px; }
   /* Controls never shrink or clip — the row wraps instead; only the
      file-path meta is allowed to compress (and hides when tight). */
-  header > :not(.meta) { flex-shrink: 0; }
-  @media (max-width: 1500px) { header .meta { display: none; } }
+  .hrow > :not(.meta) { flex-shrink: 0; }
+  @media (max-width: 1100px) { header .meta { display: none; } }
+  .legend { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .logo { display: flex; align-items: center; gap: 9px; }
   .logo svg { width: 24px; height: 24px; flex-shrink: 0; }
   .logo .name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
@@ -129,7 +136,7 @@ PAGE_HTML = r"""<!doctype html>
 
   /* ---------- layout ---------- */
   main { display: flex; gap: 20px; padding: 20px; align-items: flex-start; justify-content: center; }
-  #sidebar { width: 370px; flex-shrink: 0; position: sticky; top: 66px; max-height: calc(100vh - 96px); overflow-y: auto; padding-bottom: 8px; }
+  #sidebar { width: 370px; flex-shrink: 0; position: sticky; top: 104px; max-height: calc(100vh - 134px); overflow-y: auto; padding-bottom: 8px; }
   #pages { flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
 
   /* ---------- search-to-mark card ---------- */
@@ -282,53 +289,56 @@ PAGE_HTML = r"""<!doctype html>
 </head>
 <body>
 <header>
-  <div class="logo">
-    <svg viewBox="0 0 24 24" fill="none">
-      <path d="M12 2 4 5.5v5.6c0 4.9 3.4 9.5 8 10.9 4.6-1.4 8-6 8-10.9V5.5L12 2Z"
-            fill="url(#g)" stroke="#4338ca" stroke-width="1.2" stroke-linejoin="round"/>
-      <path d="M8.6 12.1l2.3 2.3 4.5-4.6" stroke="#fff" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round"/>
-      <defs><linearGradient id="g" x1="4" y1="2" x2="20" y2="22">
-        <stop stop-color="#818cf8"/><stop offset="1" stop-color="#4f46e5"/>
-      </linearGradient></defs>
-    </svg>
-   <div><div class="name">Privacy Firewall</div><div class="sub">Redaction review</div></div>
-   </div>
-   <button class="btn" id="home-btn" style="display:none" title="Back to dashboard">&larr; Dashboard</button>
-   <span class="meta" id="meta"></span>
-  <span class="spacer"></span>
-  <span class="toolgroup" id="pagenav" title="Jump between pages">
-    <button id="page-prev">&#9666;</button>
-    <span class="val" id="page-ind">–</span>
-    <button id="page-next">&#9656;</button>
-  </span>
-  <span class="toolgroup" title="Zoom">
-    <button id="zoom-out">&minus;</button>
-    <span class="val" id="zoom-val">100%</span>
-    <button id="zoom-in">+</button>
-    <button id="zoom-fit" style="font-size:11px">Fit</button>
-  </span>
-  <span class="pill redact" id="count-redact">0</span>
-  <span class="pill ask" id="count-ask">0</span>
-  <span class="pill keep" id="count-keep">0</span>
-  <button class="btn" id="preview-btn">Preview</button>
-  <button class="btn" id="save">Save plan</button>
-  <select class="ctl" id="style" title="Redaction style">
-    <option value="replace" selected>Redact with *****</option>
-    <option value="black_bar">Black bar</option>
-    <option value="highlight">Highlight only</option>
-  </select>
-  <button class="btn primary" id="apply">Apply &amp; export PDF</button>
+  <div class="hrow">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 2 4 5.5v5.6c0 4.9 3.4 9.5 8 10.9 4.6-1.4 8-6 8-10.9V5.5L12 2Z"
+              fill="url(#g)" stroke="#4338ca" stroke-width="1.2" stroke-linejoin="round"/>
+        <path d="M8.6 12.1l2.3 2.3 4.5-4.6" stroke="#fff" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="g" x1="4" y1="2" x2="20" y2="22">
+          <stop stop-color="#818cf8"/><stop offset="1" stop-color="#4f46e5"/>
+        </linearGradient></defs>
+      </svg>
+      <div><div class="name">Privacy Firewall</div><div class="sub">Redaction review</div></div>
+    </div>
+    <button class="btn" id="home-btn" style="display:none" title="Back to dashboard">&larr; Dashboard</button>
+    <span class="meta" id="meta"></span>
+    <span class="spacer"></span>
+    <span class="pill redact" id="count-redact">0</span>
+    <span class="pill ask" id="count-ask">0</span>
+    <span class="pill keep" id="count-keep">0</span>
+    <button class="btn" id="save">Save plan</button>
+    <button class="btn primary" id="apply">Apply &amp; export PDF</button>
+  </div>
+  <div class="hrow tools">
+    <span class="toolgroup" id="pagenav" title="Jump between pages">
+      <button id="page-prev">&#9666;</button>
+      <span class="val" id="page-ind">–</span>
+      <button id="page-next">&#9656;</button>
+    </span>
+    <span class="toolgroup" title="Zoom">
+      <button id="zoom-out">&minus;</button>
+      <span class="val" id="zoom-val">100%</span>
+      <button id="zoom-in">+</button>
+      <button id="zoom-fit" style="font-size:11px">Fit</button>
+    </span>
+    <select class="ctl" id="style" title="Redaction style">
+      <option value="replace" selected>Redact with *****</option>
+      <option value="black_bar">Black bar</option>
+      <option value="highlight">Highlight only</option>
+    </select>
+    <button class="btn" id="preview-btn">Preview</button>
+    <span class="legend"><span class="swatch" style="background:rgba(5,150,105,.7)"></span>redacted
+      <span class="swatch" style="background:rgba(217,119,6,.7)"></span>needs review
+      <span class="swatch" style="background:rgba(100,116,139,.5)"></span>kept</span>
+  </div>
 </header>
 <div id="banner"></div>
 <div id="preview-banner">Previewing redacted output — this is exactly what the exported PDF will look like.</div>
 <div class="hint">
   <b>Tip:</b> drag a box over any text on a page to mark every instance of it as PII.
   Shortcuts: <kbd>n</kbd>/<kbd>p</kbd> next/prev needs-review, <kbd>r</kbd> redact, <kbd>k</kbd> keep.
-  <span class="spacer" style="flex:1"></span>
-  <span><span class="swatch" style="background:rgba(5,150,105,.7)"></span>redacted
-  <span class="swatch" style="background:rgba(217,119,6,.7)"></span>needs review
-  <span class="swatch" style="background:rgba(100,116,139,.5)"></span>kept</span>
 </div>
 <main>
   <aside id="sidebar">
