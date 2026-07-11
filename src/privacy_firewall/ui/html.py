@@ -942,11 +942,16 @@ async function markText(text, label, caseSensitive) {
   try {
     const result = await api("api/mark",
       {text: text, label: label, case_sensitive: caseSensitive});
-    if (result.added === 0) {
-      toast("No new matches — the text was not found (or is already marked).", "warn");
+    const skipped = result.skipped || 0;
+    if (result.added === 0 && skipped > 0) {
+      toast("All " + skipped + (skipped > 1 ? " matches are" : " match is") +
+            " already marked.");
+    } else if (result.added === 0) {
+      toast("Text not found in the document.", "warn");
     } else {
       toast("Marked " + result.added + " instance" + (result.added > 1 ? "s" : "") +
-            " as " + label.toUpperCase() + " for redaction.");
+            " as " + label.toUpperCase() + " for redaction" +
+            (skipped > 0 ? " (" + skipped + " already marked)" : "") + ".");
     }
     await refreshPlan();
   } catch (err) {

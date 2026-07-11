@@ -7,6 +7,7 @@ testable without the ``ui`` extra installed.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,19 @@ from privacy_firewall.renderer.page_images import (
     render_page_image_bytes,
 )
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
+
+
+@dataclass(frozen=True)
+class MarkResult:
+    """Outcome of a :meth:`ReviewSession.mark_text` call.
+
+    Attributes:
+        added: The newly created review entries.
+        skipped: Matches that were found but already in the plan.
+    """
+
+    added: list[ReviewEntry]
+    skipped: int
 
 
 class ReviewSession:
@@ -318,9 +332,7 @@ class ReviewSession:
         msg = f"page {page_number} not found"
         raise ValueError(msg)
 
-    def mark_text(
-        self, text: str, label: str, *, case_sensitive: bool = False
-    ) -> list[ReviewEntry]:
+    def mark_text(self, text: str, label: str, *, case_sensitive: bool = False) -> MarkResult:
         """Mark every instance of *text* in the document as PII.
 
         Each occurrence becomes a manual ``Detection`` (detector name
@@ -337,8 +349,10 @@ class ReviewSession:
             case_sensitive: Require an exact-case match.
 
         Returns:
-            The newly added entries (empty if nothing matched or every
-            match was already in the plan).
+            A :class:`MarkResult` with the newly added entries and the
+            count of matches skipped because they were already marked —
+            so the caller can tell "nothing found" from "all already
+            marked".
 
         Raises:
             ValueError: If *text* or *label* is blank.
@@ -358,6 +372,7 @@ class ReviewSession:
         )
         known_ids = {entry.detection_id for entry in self.plan.entries}
         added: list[ReviewEntry] = []
+        skipped = 0
 
         for page in self.document.pages:
             # Spans are offset into a page-level concatenation of block
@@ -381,6 +396,7 @@ class ReviewSession:
                         reasons=("marked as PII by the reviewer",),
                     )
                     if detection.detection_id in known_ids:
+                        skipped += 1
                         continue
                     known_ids.add(detection.detection_id)
                     entry = ReviewEntry(
@@ -400,7 +416,7 @@ class ReviewSession:
                     e.detection.detection_type,
                 )
             )
-        return added
+        return MarkResult(added=added, skipped=skipped)
 
     def remove_manual_entry(self, detection_id: str) -> bool:
         """Remove a manually marked entry from the plan.

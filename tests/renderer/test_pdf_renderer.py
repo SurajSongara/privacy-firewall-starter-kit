@@ -292,6 +292,75 @@ class TestPDFRenderer:
         assert abs(x_of(result, "KEEPME") - keep_before) < 0.5
         assert abs(x_of(result, "TAIL") - tail_before) < 0.5
 
+    def test_overlapping_detections_render_one_star_run(self) -> None:
+        """Detector + manual entries covering the same text must not
+        paint stars over stars — overlapping same-type rects merge."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 100), "Mail: user@example.com done", fontsize=12)
+        email_rects = page.search_for("user@example.com")
+        assert email_rects
+        full = email_rects[0]
+        data = doc.tobytes()
+        doc.close()
+
+        def email_det(x1: float) -> Detection:
+            return Detection(
+                detector_name="email",
+                detection_type="EMAIL",
+                text="user@example.com",
+                span=Span(start=6, end=22),
+                bbox=BoundingBox(x0=full.x0, y0=full.y0, x1=x1, y1=full.y1),
+                page_number=1,
+                confidence=0.9,
+            )
+
+        # Full-width detector bbox + a half-width manual bbox of the same text.
+        half_x1 = full.x0 + (full.x1 - full.x0) / 2
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=email_det(full.x1),
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="****************",
+                    page_number=1,
+                    bbox=email_det(full.x1).bbox,
+                ),
+                Redaction(
+                    detection=email_det(half_x1),
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="********",
+                    page_number=1,
+                    bbox=email_det(half_x1).bbox,
+                ),
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as d:
+            text = d[0].get_text()
+            star_words = [w for w in text.split() if set(w) == {"*"}]
+        assert "user@example.com" not in text
+        assert "Mail:" in text and "done" in text
+        assert len(star_words) == 1  # one clean star run, not two overlapping
+
+    def test_merge_overlapping_jobs_keeps_disjoint_rects(self) -> None:
+        a = fitz.Rect(0, 0, 10, 10)
+        b = fitz.Rect(20, 0, 30, 10)  # disjoint
+        c = fitz.Rect(5, 0, 25, 10)  # bridges both
+        jobs = [
+            (a, RedactionType.REPLACE, "***"),
+            (b, RedactionType.REPLACE, "*****"),
+            (c, RedactionType.REPLACE, "**********"),
+        ]
+        merged = PDFRenderer._merge_overlapping_jobs(jobs)
+        assert len(merged) == 1  # c chains a and b into one union
+        rect, rtype, replacement = merged[0]
+        assert rect == fitz.Rect(0, 0, 30, 10)
+        assert replacement == "**********"  # widest rect's replacement wins
+
+        disjoint = PDFRenderer._merge_overlapping_jobs(jobs[:2])
+        assert len(disjoint) == 2  # nothing merged without overlap
+
     def test_base14_font_mapping(self) -> None:
         assert PDFRenderer._base14_for("Courier-Bold") == "cour"
         assert PDFRenderer._base14_for("JetBrainsMono-Regular") == "cour"

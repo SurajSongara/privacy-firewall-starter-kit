@@ -135,14 +135,15 @@ def create_app(session: ReviewSession) -> FastAPI:
     def mark(request: MarkRequest) -> dict:  # type: ignore[type-arg]
         ensure_ready()
         try:
-            entries = session.mark_text(
+            result = session.mark_text(
                 request.text, request.label, case_sensitive=request.case_sensitive
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {
-            "added": len(entries),
-            "entries": [session.entry_dict(e) for e in entries],
+            "added": len(result.added),
+            "skipped": result.skipped,
+            "entries": [session.entry_dict(e) for e in result.added],
             "counts": session.plan.counts(),
         }
 
