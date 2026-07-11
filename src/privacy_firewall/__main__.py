@@ -38,7 +38,10 @@ def callback(
         Path,
         typer.Option(
             "--workspace",
-            help="Folder scanned for PDFs and used to store uploads (default: current directory).",
+            help=(
+                "Folder scanned for documents (PDF, images, txt, md, docx) "
+                "and used to store uploads (default: current directory)."
+            ),
         ),
     ] = Path.cwd(),
     port: Annotated[
@@ -55,7 +58,7 @@ def callback(
     Args:
         ctx: The Typer context.
         version_flag: When True, prints the installed package version and exits.
-        workspace: Folder scanned for PDFs and used to store uploads.
+        workspace: Folder scanned for documents and used to store uploads.
         port: Fixed port, or ``None`` for an OS-assigned free port.
         no_browser: When True, don't open the browser automatically.
     """

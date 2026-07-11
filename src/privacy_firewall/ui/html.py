@@ -423,7 +423,7 @@ const STAGE_LABELS = {
 async function boot() {
   let status;
   try {
-    status = await api("/api/status");
+    status = await api("api/status");
   } catch (err) {
     setTimeout(boot, 1200);
     return;
@@ -442,7 +442,7 @@ async function boot() {
     setTimeout(boot, 800);
     return;
   }
-  PLAN = await api("/api/plan");
+  PLAN = await api("api/plan");
   document.getElementById("loading").style.display = "none";
   initPages();
   render();
@@ -595,7 +595,9 @@ function initPages() {
 }
 
 function pageSrc(n) {
-  return PREVIEW ? "/api/preview/" + n + "?t=" + Date.now() : "/api/page/" + n;
+  // Relative paths so the page works standalone ("/") and mounted
+  // under the studio ("/review/{doc_id}/").
+  return PREVIEW ? "api/preview/" + n + "?t=" + Date.now() : "api/page/" + n;
 }
 
 function renderOverlays() {
@@ -674,7 +676,7 @@ document.addEventListener("keydown", e => {
 async function buildTextLayer(p, wrap) {
   if (!WORDS[p.page_number]) {
     try {
-      WORDS[p.page_number] = (await api("/api/text/" + p.page_number)).words;
+      WORDS[p.page_number] = (await api("api/text/" + p.page_number)).words;
     } catch (err) {
       WORDS[p.page_number] = [];
     }
@@ -860,14 +862,14 @@ document.addEventListener("mouseup", e => {
 /* ---------- actions ---------- */
 
 async function refreshPlan() {
-  const plan = await api("/api/plan");
+  const plan = await api("api/plan");
   PLAN.entries = plan.entries;
   PLAN.counts = plan.counts;
   render();
 }
 
 async function decide(id, decision, skipRender) {
-  await api("/api/decision", {detection_id: id, decision: decision});
+  await api("api/decision", {detection_id: id, decision: decision});
   const entry = PLAN.entries.find(e => e.detection_id === id);
   entry.decision = decision;
   entry.effective_action = decision !== null ? decision : entry.suggested_action;
@@ -888,7 +890,7 @@ async function bulkDecide(type, act) {
 
 async function markText(text, label, caseSensitive) {
   try {
-    const result = await api("/api/mark",
+    const result = await api("api/mark",
       {text: text, label: label, case_sensitive: caseSensitive});
     if (result.added === 0) {
       toast("No new matches — the text was not found (or is already marked).", "warn");
@@ -929,7 +931,7 @@ document.getElementById("search-text").addEventListener("keydown", e => {
 
 async function removeManual(id) {
   try {
-    await api("/api/remove", {detection_id: id});
+    await api("api/remove", {detection_id: id});
     PLAN.entries = PLAN.entries.filter(e => e.detection_id !== id);
     render();
     toast("Manual mark removed.");
@@ -940,7 +942,7 @@ async function removeManual(id) {
 
 async function rerunWithOcr() {
   try {
-    await api("/api/rerun", {});
+    await api("api/rerun", {});
   } catch (err) {
     toast("Re-run failed: " + err.message, "warn");
     return;
@@ -955,6 +957,9 @@ async function rerunWithOcr() {
   document.getElementById("load-spinner").style.display = "";
   document.getElementById("load-stage").className = "stage";
   bootStart = Date.now();
+  boot();
+}
+
 /* ---------- dashboard link (studio mode only) ---------- */
 if (location.search.includes("studio")) {
   const hb = document.getElementById("home-btn");
@@ -962,12 +967,9 @@ if (location.search.includes("studio")) {
   hb.addEventListener("click", () => { window.location.href = "/"; });
 }
 
-boot();
-}
-
 document.getElementById("save").addEventListener("click", async () => {
   try {
-    const result = await api("/api/save", {});
+    const result = await api("api/save", {});
     toast("Plan saved: " + result.plan_path);
   } catch (err) {
     toast("Save failed: " + err.message, "warn");
@@ -980,7 +982,7 @@ document.getElementById("apply").addEventListener("click", async () => {
   btn.textContent = "Applying…";
   try {
     const style = document.getElementById("style").value;
-    const result = await api("/api/apply", {redaction_type: style});
+    const result = await api("api/apply", {redaction_type: style});
     const banner = document.getElementById("banner");
     banner.style.display = "block";
     banner.textContent = `Redacted PDF written: ${result.output_path} ` +
@@ -1053,7 +1055,7 @@ STUDIO_HTML = r"""<!doctype html>
   #drop.hover { border-color: var(--accent); background: #eef2ff; }
   #drop .big { font-size: 15px; font-weight: 600; }
   #drop .small { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
-  #drop input[type=file] { display: none; }
+  #drop input[type=file], #file { display: none; }
 
   /* document list */
   .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .05em;
@@ -1100,18 +1102,19 @@ STUDIO_HTML = r"""<!doctype html>
     <div><div class="name">Privacy Firewall</div><div class="sub">Studio</div></div>
   </div>
   <span class="spacer"></span>
-  <button class="btn primary" id="upload-btn">Upload PDF</button>
-  <input type="file" id="file" accept="application/pdf" multiple>
+  <button class="btn primary" id="upload-btn">Upload documents</button>
+  <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.txt,.md,.docx" multiple>
 </header>
 
 <main>
   <h1>Review documents for PII</h1>
-  <p class="lede">Open a PDF to detect and redact sensitive information. Everything runs locally on your machine.</p>
+  <p class="lede">Open a document to detect and redact sensitive information. Everything runs locally on your machine.</p>
 
   <div id="drop">
-    <div class="big">Drop PDFs here, or click to choose</div>
-    <div class="small">Files are saved into this workspace folder and stay on your computer.</div>
-    <input type="file" id="drop-file" accept="application/pdf" multiple>
+    <div class="big">Drop documents here, or click to choose</div>
+    <div class="small">PDF, images (PNG · JPG · TIFF · BMP · WebP · GIF), TXT, MD, and DOCX.
+      Files are saved into this workspace folder and stay on your computer.</div>
+    <input type="file" id="drop-file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.gif,.txt,.md,.docx" multiple>
   </div>
 
   <div class="section-title">Documents in this workspace</div>
@@ -1171,7 +1174,7 @@ async function refresh() {
     return;
   }
   if (!data.documents.length) {
-    docs.innerHTML = '<div class="empty">No PDFs yet. Drop a file above to get started.</div>';
+    docs.innerHTML = '<div class="empty">No documents yet. Drop a file above to get started.</div>';
     return;
   }
   docs.innerHTML = "";
@@ -1180,7 +1183,7 @@ async function refresh() {
     card.className = "doc";
     card.innerHTML = `
       <div class="top">
-        <div class="ico">PDF</div>
+        <div class="ico">${esc((d.type || "pdf").toUpperCase().slice(0, 4))}</div>
         <div style="min-width:0">
           <div class="nm">${esc(d.name)}</div>
           <div class="meta">${fmtSize(d.size)} · ${fmtDate(d.modified)}</div>
