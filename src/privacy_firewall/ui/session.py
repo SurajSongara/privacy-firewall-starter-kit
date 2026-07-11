@@ -100,6 +100,7 @@ class ReviewSession:
         self.ocr_provider = ocr_provider
         self.terms_store = terms_store
         self._applied_term_keys: set[tuple[str, str]] = set()
+        self._page_dims: list[dict[str, Any]] | None = None
         self._page_cache: dict[int, bytes] = {}
         self._char_words_cache: dict[int, dict[str, list[dict[str, Any]]]] = {}
         self._preview_pdf: bytes | None = None
@@ -689,6 +690,24 @@ class ReviewSession:
 
         self._char_words_cache[page_number] = index
         return index
+
+    def page_dimensions(self) -> list[dict[str, Any]]:
+        """Page numbers and sizes straight from the PDF (cached).
+
+        Unlike :attr:`document`, this works while the pipeline is still
+        running, so the UI can show the pages during a long OCR pass.
+        """
+        if self._page_dims is None:
+            with fitz.open(str(self.pdf_path)) as doc:
+                self._page_dims = [
+                    {
+                        "page_number": i + 1,
+                        "width": page.rect.width,
+                        "height": page.rect.height,
+                    }
+                    for i, page in enumerate(doc)
+                ]
+        return self._page_dims
 
     def page_png(self, page_number: int) -> bytes:
         """Rendered PNG for a page (cached per session)."""

@@ -102,6 +102,15 @@ def create_app(session: ReviewSession) -> FastAPI:
         threading.Thread(target=worker, daemon=True).start()
         return session.status_payload()
 
+    @app.get("/api/pages")
+    def pages() -> dict:  # type: ignore[type-arg]
+        # Deliberately no ensure_ready(): page geometry comes straight
+        # from the PDF so the UI can render pages during a long OCR run.
+        try:
+            return {"pages": session.page_dimensions()}
+        except Exception as exc:  # noqa: BLE001 - unreadable/corrupt file
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     @app.get("/api/plan")
     def plan() -> dict:  # type: ignore[type-arg]
         ensure_ready()
