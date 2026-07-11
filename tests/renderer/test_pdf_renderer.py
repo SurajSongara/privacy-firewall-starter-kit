@@ -241,6 +241,57 @@ class TestPDFRenderer:
         assert spans, "replacement stars must be drawn"
         assert spans[0]["color"] == 0xFFFFFF  # white, like the original
 
+    def test_replace_does_not_shift_surviving_line_text(self) -> None:
+        """Kerned lines must not drift when part of them is redacted.
+
+        MuPDF rewrites any text line a redaction touches and drops the
+        original TJ kerning, shifting the surviving text sideways. The
+        renderer removes affected lines whole and re-inserts survivors
+        at their original positions, so positions must be identical.
+        """
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 700), "placeholder", fontname="helv", fontsize=10)
+        # Rewrite the content stream with an explicitly kerned TJ line.
+        doc.update_stream(
+            page.get_contents()[0],
+            b"BT /helv 10 Tf 50 700 Td [(SECRET1234) -600 ( KEEPME) -600 ( TAIL)] TJ ET",
+        )
+        data = doc.tobytes()
+        doc.close()
+
+        def x_of(pdf: bytes, needle: str) -> float:
+            with fitz.open(stream=pdf, filetype="pdf") as d:
+                rects = d[0].search_for(needle)
+            assert rects, f"{needle} not found"
+            return rects[0].x0
+
+        keep_before = x_of(data, "KEEPME")
+        tail_before = x_of(data, "TAIL")
+
+        det = _detection()
+        det = det.model_copy(update={"text": "SECRET1234"})
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="**********",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as d:
+            text = d[0].get_text()
+        assert "SECRET1234" not in text
+        assert "KEEPME" in text
+        assert "*" in text
+        assert abs(x_of(result, "KEEPME") - keep_before) < 0.5
+        assert abs(x_of(result, "TAIL") - tail_before) < 0.5
+
     def test_base14_font_mapping(self) -> None:
         assert PDFRenderer._base14_for("Courier-Bold") == "cour"
         assert PDFRenderer._base14_for("JetBrainsMono-Regular") == "cour"
