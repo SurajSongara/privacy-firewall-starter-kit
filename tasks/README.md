@@ -65,7 +65,25 @@ Delivered:
 - `detect --plan/--policy`, `redact --plan --interactive|--yes`
 - `privacy-firewall review file.pdf` — offline web UI (optional extra `[ui]`)
 
-P010 (feedback memory) stays deferred until the review UI has real usage, per its spec.
+P010 (feedback memory) was deferred until the review UI had real usage; F004 un-defers it at workspace scope.
+
+## Phase 3.5 — Studio & Review UX (Complete ✅, shipped ad hoc)
+
+Post-P009 work delivered outside the task tracker: Studio dashboard with multi-format ingestion (images/txt/md/docx → PDF), style-matched star redactions, layout-stable redaction (surviving line text no longer shifts), review UI overhaul (two-row header, zoom, view-result), partial-word drag selection with editable mark popup, and instance-scoped renderer bbox search (repeated-text stars stay styled, per-instance keep/redact honoured).
+
+## Phase 4 — Trust & Recall Pack (Planned)
+
+Close the gaps real usage exposed: honest UI feedback, the last known FP class, exact redaction geometry, and the two features that end repetitive manual marking.
+
+Principles: Redaction boxes must be glyph-exact → Remembered marks are suggestions, not decisions → Deterministic name evidence before NER
+
+| # | Task | Status |
+|---|------|--------|
+| F001 | Review UX Polish — honest mark feedback + overlapping-rect merge | ⏳ Pending |
+| F002 | Phone Precision — UTR/Ref-ID trap demotion (≥0.9 precision) | ⏳ Pending |
+| F003 | Char Geometry — rawdict per-char bboxes; exact sub-word redaction | ⏳ Pending |
+| F004 | Workspace Memory — remembered marks across documents (P010 scope) | ⏳ Pending |
+| F005 | Name Detection — deterministic NAME detector from document evidence | ⏳ Pending |
 
 ## Workflow
 

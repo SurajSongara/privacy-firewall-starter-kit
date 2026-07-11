@@ -1,4 +1,4 @@
-Status: P009_COMPLETE — Phase 3 complete (P010 feedback memory deferred)
+Status: PHASE_4_PLANNED — Phases 1–3 complete (+ Studio/Review UX shipped ad hoc); next task F001
 
 ## Phase 1 — Core Engine (Complete)
 
@@ -18,48 +18,59 @@ Status: P009_COMPLETE — Phase 3 complete (P010 feedback memory deferred)
 - Golden Dataset — examples/ with benchmark structure (TASK-014)
 - Project Review — architecture review, refactor, docs (TASK-015)
 
-## Refactoring Applied
+## Phase 2 — Ingestion Robustness (Complete)
 
-- Extracted `is_exact_duplicate` / `is_containment_duplicate` to `detectors/utils.py`
-- Removed duplicate `_is_duplicate` methods from Aadhaar, Phone, UPI detectors
-- Updated README.md with full feature docs and usage examples
-- Updated IMPLEMENTATION_ORDER.md with correct TASK-013 description
+R001–R010: diagnostics + text-quality scoring, pipeline selector (native/OCR/hybrid),
+OCR provider interface + adapters, hybrid merge, layout analyzer, bank profiler
+(SBI/HDFC/ICICI/Axis/generic), `doctor` CLI, regression suite.
 
-## Architecture
+## Phase 3 — Precision & Review Pack (Complete; P010 superseded by F004)
 
-```
-PDF/Image -> Parser -> Document -> Detectors -> Fusion -> Planner -> Renderer
-```
+P001–P009: detection evidence (`detection_id` + `reasons`), context scoring,
+FP fixes (Aadhaar first-digit + Verhoeff, email TLD allowlist), precision
+benchmark, policy profiles (`share-with-ai` / `kyc` / `minimal`), decision
+engine → ReviewPlan JSON contract, plan CLI (`--plan/--interactive/--yes`),
+page image renderer, offline review web UI (`privacy-firewall review`).
 
-- 231 tests passing, ruff clean, mypy clean
-- 6 detectors, 2 redaction modes (full-block + values-only)
-- CLI contains zero business logic
-
-## Phase 3 — Precision & Review Pack (Planned)
-
-Detection ≠ decision: insert a policy-driven DecisionEngine between fusion and planning, fix known false positives (Aadhaar Verhoeff, phone/email context), and add an offline local-web review UI where the engine pre-selects and the user confirms. Pipeline becomes:
+Pipeline:
 
 ```
-Detectors -> Fusion -> DecisionEngine (policy) -> ReviewPlan (user review) -> Planner -> Renderer
+PDF/Image -> Parser (+OCR/hybrid) -> Document -> Detectors -> Fusion
+          -> DecisionEngine (policy) -> ReviewPlan (user review) -> Planner -> Renderer
 ```
 
-Tasks P001–P010 in `tasks/` (see `tasks/README.md`). Build order: precision fixes (P001–P004) → policy + plan-file CLI (P005–P007) → review UI (P008–P009) → feedback memory (P010).
+## Phase 3.5 — Studio & Review UX (Complete, shipped ad hoc)
 
-## Phase 2 — Upcoming
+- Studio dashboard (`privacy-firewall` with no args): workspace document list,
+  uploads, multi-format ingestion (images/txt/md/docx converted to PDF once).
+- Style-matched star redactions + layout-stable redaction (affected lines are
+  removed whole and surviving characters re-inserted at original origins).
+- Review UI overhaul: two-row header, real zoom, page nav, preview mode,
+  view-result after apply.
+- Partial-word drag selection (proportional char mapping) with editable mark
+  popup; search-to-mark card.
+- Renderer: instance-scoped bbox search + rect dedupe — repeated-text stars
+  stay styled and per-instance keep/redact decisions are honoured.
 
-Next tasks in `tasks/privacy-firewall-robustness-pack/`:
+## Phase 4 — Trust & Recall Pack (Planned — next task F001)
 
-| Task | Area |
-|------|------|
-| R001 | Document Diagnostics |
-| R002 | Text Quality Heuristics |
-| R003 | Pipeline Selector |
-| R004 | OCR Provider Interface |
-| R005 | PaddleOCR Integration |
-| R006 | Hybrid Merge |
-| R007 | Layout Analyzer |
-| R008 | Bank Profile |
-| R009 | Doctor CLI |
-| R010 | Regression Suite |
+Tasks F001–F005 in `tasks/` (see `tasks/README.md`). Build order:
+review UX polish (F001) → phone precision (F002) → exact char geometry (F003)
+→ workspace memory (F004) → name detection (F005).
 
-Focus: ingestion robustness (OCR, layout analysis) before adding more detectors.
+Known issues Phase 4 addresses:
+
+- "No new matches" toast conflates already-marked with not-found (F001).
+- Overlapping detector + manual rects double-draw stars (F001).
+- PHONE precision 75% — UTR/Ref-ID traps on statement1-5.pdf (F002).
+- Sub-word bboxes interpolated proportionally — inexact on proportional
+  fonts; block-text/span order mismatch on glyph-heavy PDFs corrupts manual
+  mark geometry (F003).
+- Manual marks don't carry across documents in a workspace (F004).
+- No NAME detector — names are always manual marks today (F005).
+
+## Environment notes
+
+- Python >= 3.12 (project runs on 3.14); `paddlepaddle` has no 3.14 wheel, so
+  the PaddleOCR adapter fails to register — Tesseract is the working default.
+- 586 tests passing, ruff clean, mypy strict clean.
