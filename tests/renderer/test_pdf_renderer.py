@@ -174,6 +174,132 @@ class TestPDFRenderer:
             page_text = doc[0].get_text()
         assert "*****" in page_text
 
+    def test_replace_matches_original_font_size(self) -> None:
+        """Replacement stars adopt the size of the text they replace."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 100), "PAN: ABCDE1234F", fontsize=8)
+        data = doc.tobytes()
+        doc.close()
+        det = _detection(bbox=BoundingBox(x0=45.0, y0=90.0, x1=155.0, y1=104.0))
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="**********",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as out:
+            spans = [
+                span
+                for block in out[0].get_text("dict")["blocks"]
+                if block.get("type") == 0
+                for line in block["lines"]
+                for span in line["spans"]
+                if "*" in span["text"]
+            ]
+        assert spans, "replacement stars must be drawn"
+        assert abs(spans[0]["size"] - 8) < 1.5
+
+    def test_replace_preserves_text_color(self) -> None:
+        """White text on a dark band stays white after replacement."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.draw_rect(fitz.Rect(40, 80, 200, 115), color=None, fill=(0.2, 0.2, 0.5))
+        page.insert_text((50, 100), "ABCDE1234F", fontsize=12, color=(1, 1, 1))
+        data = doc.tobytes()
+        doc.close()
+        det = _detection(bbox=BoundingBox(x0=45.0, y0=88.0, x1=155.0, y1=104.0))
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="**********",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as out:
+            spans = [
+                span
+                for block in out[0].get_text("dict")["blocks"]
+                if block.get("type") == 0
+                for line in block["lines"]
+                for span in line["spans"]
+                if "*" in span["text"]
+            ]
+        assert spans, "replacement stars must be drawn"
+        assert spans[0]["color"] == 0xFFFFFF  # white, like the original
+
+    def test_replace_does_not_shift_surviving_line_text(self) -> None:
+        """Kerned lines must not drift when part of them is redacted.
+
+        MuPDF rewrites any text line a redaction touches and drops the
+        original TJ kerning, shifting the surviving text sideways. The
+        renderer removes affected lines whole and re-inserts survivors
+        at their original positions, so positions must be identical.
+        """
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 700), "placeholder", fontname="helv", fontsize=10)
+        # Rewrite the content stream with an explicitly kerned TJ line.
+        doc.update_stream(
+            page.get_contents()[0],
+            b"BT /helv 10 Tf 50 700 Td [(SECRET1234) -600 ( KEEPME) -600 ( TAIL)] TJ ET",
+        )
+        data = doc.tobytes()
+        doc.close()
+
+        def x_of(pdf: bytes, needle: str) -> float:
+            with fitz.open(stream=pdf, filetype="pdf") as d:
+                rects = d[0].search_for(needle)
+            assert rects, f"{needle} not found"
+            return rects[0].x0
+
+        keep_before = x_of(data, "KEEPME")
+        tail_before = x_of(data, "TAIL")
+
+        det = _detection()
+        det = det.model_copy(update={"text": "SECRET1234"})
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="**********",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as d:
+            text = d[0].get_text()
+        assert "SECRET1234" not in text
+        assert "KEEPME" in text
+        assert "*" in text
+        assert abs(x_of(result, "KEEPME") - keep_before) < 0.5
+        assert abs(x_of(result, "TAIL") - tail_before) < 0.5
+
+    def test_base14_font_mapping(self) -> None:
+        assert PDFRenderer._base14_for("Courier-Bold") == "cour"
+        assert PDFRenderer._base14_for("JetBrainsMono-Regular") == "cour"
+        assert PDFRenderer._base14_for("TimesNewRomanPSMT") == "tiro"
+        assert PDFRenderer._base14_for("Helvetica") == "helv"
+        assert PDFRenderer._base14_for("Arial-BoldMT") == "helv"
+        assert PDFRenderer._base14_for("") == "helv"
+
     def test_highlight_preserves_text_content(self) -> None:
         """HIGHLIGHT should be visual-only and not remove text."""
         data = _make_simple_pdf()
