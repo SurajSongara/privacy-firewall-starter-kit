@@ -166,10 +166,17 @@ class TestRedactionPlanner:
         plan = self.planner.plan(self.doc, detections)
         assert plan.redactions[0].redaction_type == RedactionType.REPLACE
 
-    def test_plan_default_replacement_text(self) -> None:
-        detections = [_detection()]
+    def test_plan_replacement_stars_match_value_length(self) -> None:
+        detections = [_detection()]  # text "ABCDE1234F" (10 chars)
         plan = self.planner.plan(self.doc, detections)
-        assert plan.redactions[0].replacement_text == "*****"
+        assert plan.redactions[0].replacement_text == "*" * 10
+
+    def test_plan_replacement_stars_are_bounded(self) -> None:
+        short = _detection(text="ab")
+        long = _detection(text="x" * 80, detection_type="LONG")
+        plan = self.planner.plan(self.doc, [short, long])
+        assert plan.redactions[0].replacement_text == "***"
+        assert plan.redactions[1].replacement_text == "*" * 32
 
     def test_plan_honours_custom_default_type(self) -> None:
         detections = [_detection()]

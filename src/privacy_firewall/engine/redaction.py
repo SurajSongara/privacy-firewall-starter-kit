@@ -110,11 +110,12 @@ class RedactionPlanner:
         """
         redactions: list[Redaction] = []
         for detection in detections:
-            replacement = (
-                detection.text
-                if default_type == RedactionType.HIGHLIGHT
-                else self.DEFAULT_REPLACEMENT
-            )
+            if default_type == RedactionType.HIGHLIGHT:
+                replacement = detection.text
+            else:
+                # Stars mirroring the value's length, so the replacement
+                # occupies roughly the same width as the original text.
+                replacement = "*" * max(3, min(len(detection.text), 32))
             redactions.append(
                 Redaction(
                     detection=detection,

@@ -24,13 +24,16 @@ class PDFRenderer:
     """RGB colour used for ``BLACK_BAR`` redactions."""
 
     REPLACE_FILL: tuple[float, float, float] = (1.0, 1.0, 1.0)
-    """Background colour behind the replacement text for ``REPLACE``."""
+    """Fallback background colour behind ``REPLACE`` text."""
 
     REPLACE_TEXT_COLOR: tuple[float, float, float] = (0.0, 0.0, 0.0)
-    """Colour of the replacement text for ``REPLACE`` redactions."""
+    """Fallback colour of the ``REPLACE`` replacement text."""
 
     DEFAULT_REPLACEMENT = "*****"
     """Replacement drawn when a ``REPLACE`` redaction carries no text."""
+
+    DEFAULT_FONT_SIZE = 11.0
+    """Fallback font size when the original style cannot be sampled."""
 
     HIGHLIGHT_COLOR: tuple[float, float, float] = (1.0, 1.0, 0.0)
     """RGB colour used for ``HIGHLIGHT`` redactions."""
@@ -129,14 +132,23 @@ class PDFRenderer:
 
                 for rect in rects:
                     if redaction.redaction_type == RedactionType.REPLACE:
-                        # Strip the text and draw the replacement (e.g. "*****")
-                        # on a white background instead of a black bar.
+                        # Strip the text and draw stars styled like the
+                        # original content: same font size, a matching
+                        # base-14 font family, the original text colour,
+                        # and the sampled background colour — so the
+                        # replacement blends into the surrounding layout.
+                        fontname, fontsize, text_color = PDFRenderer._sample_text_style(page, rect)
+                        fill = PDFRenderer._sample_background(page, rect)
+                        replacement = redaction.replacement_text or PDFRenderer.DEFAULT_REPLACEMENT
+                        replacement = PDFRenderer._fit_stars(replacement, rect, fontsize)
                         page.add_redact_annot(
                             rect,
-                            text=redaction.replacement_text or PDFRenderer.DEFAULT_REPLACEMENT,
-                            fill=PDFRenderer.REPLACE_FILL,
-                            text_color=PDFRenderer.REPLACE_TEXT_COLOR,
-                            align=fitz.TEXT_ALIGN_CENTER,
+                            text=replacement,
+                            fontname=fontname,
+                            fontsize=fontsize,
+                            fill=fill,
+                            text_color=text_color,
+                            align=fitz.TEXT_ALIGN_LEFT,
                         )
                         has_destructive = True
                     elif redaction.redaction_type == RedactionType.BLACK_BAR:
@@ -153,3 +165,100 @@ class PDFRenderer:
 
             if has_destructive:
                 page.apply_redactions()
+
+    @staticmethod
+    def _sample_text_style(page: Any, rect: Any) -> tuple[str, float, tuple[float, float, float]]:
+        """Dominant text style (base-14 font, size, colour) inside *rect*.
+
+        Samples the spans that overlap the redaction rectangle before the
+        text is stripped, so the replacement stars can match the original
+        content. Falls back to Helvetica at a size derived from the rect
+        height (covers OCR'd scans, where there is no real text layer).
+        """
+        best_area = 0.0
+        font = ""
+        size = 0.0
+        color = 0
+        try:
+            for block in page.get_text("dict", clip=rect).get("blocks", []):
+                if block.get("type") != 0:
+                    continue
+                for line in block.get("lines", []):
+                    for span in line.get("spans", []):
+                        overlap = fitz.Rect(span["bbox"]) & rect
+                        area = max(overlap.width, 0.0) * max(overlap.height, 0.0)
+                        if area > best_area:
+                            best_area = area
+                            font = span.get("font", "")
+                            size = float(span.get("size", 0.0))
+                            color = int(span.get("color", 0))
+        except Exception:  # noqa: BLE001 - style matching must never block redaction
+            best_area = 0.0
+
+        if best_area <= 0.0 or size <= 0.0:
+            fallback = max(4.0, min(PDFRenderer.DEFAULT_FONT_SIZE, rect.height * 0.75))
+            return "helv", fallback, PDFRenderer.REPLACE_TEXT_COLOR
+        rgb = (
+            ((color >> 16) & 255) / 255.0,
+            ((color >> 8) & 255) / 255.0,
+            (color & 255) / 255.0,
+        )
+        return PDFRenderer._base14_for(font), min(size, rect.height), rgb
+
+    @staticmethod
+    def _base14_for(font: str) -> str:
+        """Nearest base-14 family for an embedded font name.
+
+        Redaction replacement text can only use standard fonts, so exact
+        matching is impossible — but keeping the family (mono / serif /
+        sans) preserves the look of the surrounding content.
+        """
+        name = font.lower()
+        if "courier" in name or "mono" in name:
+            return "cour"
+        if "times" in name or "georgia" in name or "garamond" in name or "book" in name:
+            return "tiro"
+        return "helv"
+
+    @staticmethod
+    def _sample_background(page: Any, rect: Any) -> tuple[float, float, float]:
+        """Most common pixel colour on the border just outside *rect*.
+
+        Approximates the local background (white page, coloured table row,
+        dark header band) so the redaction patch doesn't punch a white
+        hole into coloured areas.
+        """
+        try:
+            pad = 2.0
+            clip = fitz.Rect(rect.x0 - pad, rect.y0 - pad, rect.x1 + pad, rect.y1 + pad)
+            clip = clip & page.rect
+            pix = page.get_pixmap(clip=clip)
+            w, h = pix.width, pix.height
+            if w < 3 or h < 3:
+                return PDFRenderer.REPLACE_FILL
+            counts: dict[tuple[int, ...], int] = {}
+            border = [(x, 0) for x in range(w)] + [(x, h - 1) for x in range(w)]
+            border += [(0, y) for y in range(h)] + [(w - 1, y) for y in range(h)]
+            for x, y in border:
+                value = tuple(pix.pixel(x, y)[:3])
+                counts[value] = counts.get(value, 0) + 1
+            most_common = max(counts, key=lambda k: counts[k])
+            return (most_common[0] / 255.0, most_common[1] / 255.0, most_common[2] / 255.0)
+        except Exception:  # noqa: BLE001 - style matching must never block redaction
+            return PDFRenderer.REPLACE_FILL
+
+    @staticmethod
+    def _fit_stars(replacement: str, rect: Any, fontsize: float) -> str:
+        """Trim a star-only replacement so it cannot overflow the rect.
+
+        ``apply_redactions`` drops replacement text that doesn't fit its
+        rectangle, which would leave a blank patch instead of stars.
+        Non-star replacements are returned unchanged.
+        """
+        if not replacement or set(replacement) != {"*"}:
+            return replacement
+        char_width = fitz.get_text_length("*", fontname="helv", fontsize=fontsize)
+        if char_width <= 0:
+            return replacement
+        max_chars = max(1, int(rect.width / char_width))
+        return replacement[:max_chars]

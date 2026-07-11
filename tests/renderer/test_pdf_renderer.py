@@ -174,6 +174,81 @@ class TestPDFRenderer:
             page_text = doc[0].get_text()
         assert "*****" in page_text
 
+    def test_replace_matches_original_font_size(self) -> None:
+        """Replacement stars adopt the size of the text they replace."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 100), "PAN: ABCDE1234F", fontsize=8)
+        data = doc.tobytes()
+        doc.close()
+        det = _detection(bbox=BoundingBox(x0=45.0, y0=90.0, x1=155.0, y1=104.0))
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="**********",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as out:
+            spans = [
+                span
+                for block in out[0].get_text("dict")["blocks"]
+                if block.get("type") == 0
+                for line in block["lines"]
+                for span in line["spans"]
+                if "*" in span["text"]
+            ]
+        assert spans, "replacement stars must be drawn"
+        assert abs(spans[0]["size"] - 8) < 1.5
+
+    def test_replace_preserves_text_color(self) -> None:
+        """White text on a dark band stays white after replacement."""
+        doc = fitz.open()
+        page = doc.new_page()
+        page.draw_rect(fitz.Rect(40, 80, 200, 115), color=None, fill=(0.2, 0.2, 0.5))
+        page.insert_text((50, 100), "ABCDE1234F", fontsize=12, color=(1, 1, 1))
+        data = doc.tobytes()
+        doc.close()
+        det = _detection(bbox=BoundingBox(x0=45.0, y0=88.0, x1=155.0, y1=104.0))
+        plan = RedactionPlan(
+            redactions=[
+                Redaction(
+                    detection=det,
+                    redaction_type=RedactionType.REPLACE,
+                    replacement_text="**********",
+                    page_number=1,
+                    span=det.span,
+                    bbox=det.bbox,
+                )
+            ]
+        )
+        result = PDFRenderer.render_bytes(data, plan)
+        with fitz.open(stream=result, filetype="pdf") as out:
+            spans = [
+                span
+                for block in out[0].get_text("dict")["blocks"]
+                if block.get("type") == 0
+                for line in block["lines"]
+                for span in line["spans"]
+                if "*" in span["text"]
+            ]
+        assert spans, "replacement stars must be drawn"
+        assert spans[0]["color"] == 0xFFFFFF  # white, like the original
+
+    def test_base14_font_mapping(self) -> None:
+        assert PDFRenderer._base14_for("Courier-Bold") == "cour"
+        assert PDFRenderer._base14_for("JetBrainsMono-Regular") == "cour"
+        assert PDFRenderer._base14_for("TimesNewRomanPSMT") == "tiro"
+        assert PDFRenderer._base14_for("Helvetica") == "helv"
+        assert PDFRenderer._base14_for("Arial-BoldMT") == "helv"
+        assert PDFRenderer._base14_for("") == "helv"
+
     def test_highlight_preserves_text_content(self) -> None:
         """HIGHLIGHT should be visual-only and not remove text."""
         data = _make_simple_pdf()
