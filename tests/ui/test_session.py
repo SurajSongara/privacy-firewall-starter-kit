@@ -56,6 +56,24 @@ class TestReviewSession:
         assert png1[:8] == b"\x89PNG\r\n\x1a\n"
         assert session.page_png(1) is png1
 
+    def test_page_png_cache_is_bounded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = tmp_path / "many.pdf"
+        doc = fitz.open()
+        for i in range(4):
+            page = doc.new_page()
+            page.insert_text((50, 100), f"page {i + 1}", fontsize=12)
+        doc.save(str(path))
+        doc.close()
+
+        monkeypatch.setattr(ReviewSession, "PAGE_CACHE_PAGES", 2)
+        session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"])
+        for n in range(1, 5):
+            session.page_png(n)
+        assert len(session._page_cache) == 2
+        assert set(session._page_cache) == {3, 4}  # LRU keeps the newest
+
     def test_apply_writes_redacted_pdf_and_plan(self, session: ReviewSession) -> None:
         out_path, count = session.apply()
         assert out_path.exists()

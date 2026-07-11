@@ -39,6 +39,9 @@ from privacy_firewall.ui.server import create_app
 from privacy_firewall.ui.session import ReviewSession
 from privacy_firewall.ui.terms import TermsStore
 
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+"""Upload cap (100 MB) — the body is read into memory for validation."""
+
 
 def _slugify(name: str) -> str:
     """Turn a filename into a safe URL path segment for a doc id."""
@@ -171,6 +174,7 @@ def create_studio_app(workspace: Path, policy_name: str = DEFAULT_POLICY_NAME) -
             if not source.exists():
                 continue
             stat = source.stat()
+            session = sessions[doc_id]
             items.append(
                 {
                     "id": doc_id,
@@ -178,7 +182,9 @@ def create_studio_app(workspace: Path, policy_name: str = DEFAULT_POLICY_NAME) -
                     "type": source.suffix.lstrip(".").lower() or "file",
                     "size": stat.st_size,
                     "modified": int(stat.st_mtime),
-                    "has_plan": sessions[doc_id].plan_file_path.exists(),
+                    "has_plan": session.plan_file_path.exists(),
+                    "status": session.status,
+                    "error": session.error or "",
                 }
             )
         return {"documents": items, "terms": len(terms_store.active_terms())}
@@ -195,6 +201,13 @@ def create_studio_app(workspace: Path, policy_name: str = DEFAULT_POLICY_NAME) -
         if dest.exists():
             dest = workspace / _unique_name(workspace, dest.name)
         data = await file.read()
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB upload limit",
+            )
+        if not data:
+            raise HTTPException(status_code=422, detail="Uploaded file is empty")
         if suffix == ".pdf" and not data.startswith(b"%PDF"):
             raise HTTPException(status_code=422, detail="File does not look like a PDF")
         dest.write_bytes(data)
@@ -232,9 +245,20 @@ def run_studio(
     """
     import webbrowser
 
+    chosen_port = port if port is not None else _free_port()
+    # Fail fast with a readable message instead of a uvicorn stack trace.
+    with socket.socket() as probe:
+        try:
+            probe.bind(("127.0.0.1", chosen_port))
+        except OSError as exc:
+            msg = (
+                f"Port {chosen_port} is already in use -- is another studio running? "
+                f"Pick a different port with --port."
+            )
+            raise SystemExit(msg) from exc
+
     app = create_studio_app(workspace, policy_name=policy_name)
 
-    chosen_port = port if port is not None else _free_port()
     url = f"http://127.0.0.1:{chosen_port}"
     print(f"Privacy Firewall Studio: {url}  (Ctrl+C to stop)")
     if open_browser:

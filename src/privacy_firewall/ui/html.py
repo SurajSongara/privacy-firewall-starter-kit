@@ -1291,6 +1291,8 @@ STUDIO_HTML = r"""<!doctype html>
   .doc .row { display: flex; align-items: center; gap: 8px; }
   .doc .tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
     background: #ecfdf5; color: #065f46; }
+  .doc .tag.busy { background: #eef2ff; color: #3730a3; }
+  .doc .tag.fail { background: #fef2f2; color: #b91c1c; }
   .doc .actions { display: flex; gap: 8px; margin-top: 4px; }
   .doc .actions .btn { flex: 1; padding: 7px 0; text-align: center; }
   .empty { color: var(--muted); text-align: center; padding: 26px; border: 1px dashed #cbd5e1;
@@ -1361,6 +1363,14 @@ function toast(msg, kind) {
   setTimeout(() => el.remove(), 4200);
 }
 
+function statusTag(d) {
+  if (d.status === "ready" || !d.status) return "";
+  if (d.status === "error") {
+    return '<span class="tag fail" title="' + esc(d.error || "") + '">Failed</span>';
+  }
+  return '<span class="tag busy">Processing…</span>';
+}
+
 async function uploadFiles(fileList) {
   for (const f of fileList) {
     const fd = new FormData();
@@ -1408,7 +1418,7 @@ async function refresh() {
           <div class="meta">${fmtSize(d.size)} · ${fmtDate(d.modified)}</div>
         </div>
       </div>
-      <div class="row">${d.has_plan ? '<span class="tag">Resume available</span>' : ''}</div>
+      <div class="row">${statusTag(d)}${d.has_plan ? '<span class="tag">Resume available</span>' : ''}</div>
       <div class="actions">
         <button class="btn primary" data-open="${esc(d.id)}">Open</button>
       </div>`;

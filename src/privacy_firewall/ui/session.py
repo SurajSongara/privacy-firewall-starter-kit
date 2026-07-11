@@ -7,6 +7,7 @@ testable without the ``ui`` extra installed.
 from __future__ import annotations
 
 import re
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -169,7 +170,7 @@ class ReviewSession:
         self.terms_store = terms_store
         self._applied_term_keys: set[tuple[str, str]] = set()
         self._page_dims: list[dict[str, Any]] | None = None
-        self._page_cache: dict[int, bytes] = {}
+        self._page_cache: OrderedDict[int, bytes] = OrderedDict()
         self._char_words_cache: dict[int, dict[str, list[dict[str, Any]]]] = {}
         self._preview_pdf: bytes | None = None
         self._preview_key: int | None = None
@@ -806,12 +807,21 @@ class ReviewSession:
                 ]
         return self._page_dims
 
+    PAGE_CACHE_PAGES = 24
+    """Rendered page PNGs kept per session (LRU) — a large scanned
+    document would otherwise pin tens of MB per mounted session."""
+
     def page_png(self, page_number: int) -> bytes:
-        """Rendered PNG for a page (cached per session)."""
-        if page_number not in self._page_cache:
-            image = render_page_image(self.pdf_path, page_number, dpi=self.dpi)
-            self._page_cache[page_number] = image.png_bytes
-        return self._page_cache[page_number]
+        """Rendered PNG for a page (bounded LRU cache per session)."""
+        cached = self._page_cache.get(page_number)
+        if cached is not None:
+            self._page_cache.move_to_end(page_number)
+            return cached
+        image = render_page_image(self.pdf_path, page_number, dpi=self.dpi)
+        self._page_cache[page_number] = image.png_bytes
+        while len(self._page_cache) > self.PAGE_CACHE_PAGES:
+            self._page_cache.popitem(last=False)
+        return image.png_bytes
 
     def preview_page_png(
         self,
