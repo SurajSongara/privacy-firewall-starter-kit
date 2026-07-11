@@ -50,6 +50,74 @@ from privacy_firewall.renderer.pdf_renderer import PDFRenderer
 from privacy_firewall.ui.terms import TermsStore
 
 
+def _bbox_iou(a: BoundingBox, b: BoundingBox) -> float:
+    """Intersection-over-union of two bounding boxes."""
+    ix0, iy0 = max(a.x0, b.x0), max(a.y0, b.y0)
+    ix1, iy1 = min(a.x1, b.x1), min(a.y1, b.y1)
+    inter = max(0.0, ix1 - ix0) * max(0.0, iy1 - iy0)
+    union = (a.x1 - a.x0) * (a.y1 - a.y0) + (b.x1 - b.x0) * (b.y1 - b.y0) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _split_span_words(text: str, bbox: BoundingBox) -> list[tuple[str, BoundingBox]]:
+    """Split a span into whitespace-delimited words with proportional boxes.
+
+    Native spans are already single words and pass through with their
+    exact bbox; OCR adapters emit line-level spans ("SURAJ SONGARA" in
+    one span), which must be split so the text layer is word-granular
+    and native/OCR twins can be deduplicated word against word.
+    """
+    total = len(text)
+    if total == 0:
+        return []
+    width = bbox.x1 - bbox.x0
+    return [
+        (
+            match.group(),
+            BoundingBox(
+                x0=bbox.x0 + match.start() / total * width,
+                y0=bbox.y0,
+                x1=bbox.x0 + match.end() / total * width,
+                y1=bbox.y1,
+            ),
+        )
+        for match in re.finditer(r"\S+", text)
+    ]
+
+
+def _dedupe_twin_words(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop words that duplicate an earlier word's text and position.
+
+    Hybrid documents carry both the native and the OCR reading of the
+    same region (the merger keeps OCR blocks below the block-level IoU
+    threshold), so the same word can appear twice at nearly identical
+    coordinates. In the UI text layer those twins stack: a drag selects
+    both and the selection text doubles ("PAN PAN"), which then matches
+    nothing. Keep the first occurrence (native blocks precede OCR ones).
+    """
+    kept: list[dict[str, Any]] = []
+    by_text: dict[str, list[dict[str, Any]]] = {}
+    for word in words:
+        duplicate = False
+        for prior in by_text.get(word["text"], ()):
+            ix0 = max(prior["x0"], word["x0"])
+            iy0 = max(prior["y0"], word["y0"])
+            ix1 = min(prior["x1"], word["x1"])
+            iy1 = min(prior["y1"], word["y1"])
+            inter = max(0.0, ix1 - ix0) * max(0.0, iy1 - iy0)
+            area_a = (word["x1"] - word["x0"]) * (word["y1"] - word["y0"])
+            area_b = (prior["x1"] - prior["x0"]) * (prior["y1"] - prior["y0"])
+            union = area_a + area_b - inter
+            if union > 0 and inter / union > 0.5:
+                duplicate = True
+                break
+        if duplicate:
+            continue
+        kept.append(word)
+        by_text.setdefault(word["text"], []).append(word)
+    return kept
+
+
 @dataclass(frozen=True)
 class MarkResult:
     """Outcome of a :meth:`ReviewSession.mark_text` call.
@@ -346,12 +414,13 @@ class ReviewSession:
                 if not isinstance(block, TextBlock):
                     continue
                 for span in block.spans:
-                    word: dict[str, Any] = {"text": span.text, **span.bbox.model_dump()}
-                    boundaries = self._char_boundaries(page_number, span.text, span.bbox)
-                    if boundaries is not None:
-                        word["cx"] = boundaries
-                    words.append(word)
-            return words
+                    for word_text, word_bbox in _split_span_words(span.text, span.bbox):
+                        word: dict[str, Any] = {"text": word_text, **word_bbox.model_dump()}
+                        boundaries = self._char_boundaries(page_number, word_text, word_bbox)
+                        if boundaries is not None:
+                            word["cx"] = boundaries
+                        words.append(word)
+            return _dedupe_twin_words(words)
         msg = f"page {page_number} not found"
         raise ValueError(msg)
 
@@ -504,6 +573,15 @@ class ReviewSession:
             0 if case_sensitive else re.IGNORECASE,
         )
         known_ids = {entry.detection_id for entry in self.plan.entries}
+        # Same-text entries already in the plan, for position-level dedup:
+        # hybrid documents carry native + OCR twins of the same region in
+        # separate blocks, which would otherwise mark every instance twice.
+        norm = " ".join(text.split()).casefold()
+        seen_boxes: list[tuple[int, BoundingBox, ReviewEntry | None]] = [
+            (e.detection.page_number, e.detection.bbox, e)
+            for e in self.plan.entries
+            if " ".join(e.detection.text.split()).casefold() == norm
+        ]
         added: list[ReviewEntry] = []
         skipped = 0
 
@@ -533,7 +611,26 @@ class ReviewSession:
                     if detection.detection_id in known_ids:
                         skipped += 1
                         continue
+                    twin_hit = False
+                    for page_no, box, existing in seen_boxes:
+                        if page_no != detection.page_number:
+                            continue
+                        if _bbox_iou(box, detection.bbox) <= 0.5:
+                            continue
+                        # Native/OCR twin, or an entry already covering
+                        # this spot — marking it means "redact", so
+                        # confirm the existing entry rather than
+                        # duplicating it.
+                        twin_hit = True
+                        if existing is not None and decision is not None:
+                            if existing.decision is None:
+                                existing.decision = decision
+                        break
+                    if twin_hit:
+                        skipped += 1
+                        continue
                     known_ids.add(detection.detection_id)
+                    seen_boxes.append((detection.page_number, detection.bbox, None))
                     entry = ReviewEntry(
                         detection=detection,
                         suggested_action=suggested,
