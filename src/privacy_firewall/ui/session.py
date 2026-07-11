@@ -87,6 +87,7 @@ class ReviewSession:
         self.error: str | None = None
         self.restored_decisions = 0
         self.restored_manual = 0
+        self.last_output_path: Path | None = None
 
         if not lazy:
             self.run()
@@ -543,4 +544,5 @@ class ReviewSession:
         )
         out = PDFRenderer().render(self.pdf_path, output_path, redaction_plan)
         self.save_plan()
+        self.last_output_path = Path(out)
         return Path(out), redaction_plan.total_redactions

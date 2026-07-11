@@ -13,7 +13,7 @@ from pathlib import Path
 
 try:
     from fastapi import FastAPI, HTTPException
-    from fastapi.responses import HTMLResponse, Response
+    from fastapi.responses import FileResponse, HTMLResponse, Response
     from pydantic import BaseModel
 except ImportError as exc:  # pragma: no cover - exercised only without the extra
     msg = "The review UI requires the 'ui' extra: pip install privacy-firewall[ui]"
@@ -186,6 +186,18 @@ def create_app(session: ReviewSession) -> FastAPI:
     def save() -> dict:  # type: ignore[type-arg]
         ensure_ready()
         return {"plan_path": str(session.save_plan())}
+
+    @app.get("/api/output")
+    def output() -> FileResponse:
+        path = session.last_output_path
+        if path is None or not path.exists():
+            raise HTTPException(status_code=404, detail="no redacted output yet — apply first")
+        return FileResponse(
+            path,
+            media_type="application/pdf",
+            filename=path.name,
+            content_disposition_type="inline",
+        )
 
     return app
 

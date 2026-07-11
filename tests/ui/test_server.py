@@ -133,6 +133,20 @@ class TestReviewServer:
         response = client.post("/api/apply", json={"redaction_type": "sparkles"})
         assert response.status_code == 422
 
+    def test_output_404_before_apply(self, client: TestClient) -> None:
+        assert client.get("/api/output").status_code == 404
+
+    def test_output_serves_redacted_pdf_after_apply(
+        self, client: TestClient, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "redacted.pdf"
+        assert client.post("/api/apply", json={"output_path": str(out)}).status_code == 200
+        response = client.get("/api/output")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert "inline" in response.headers.get("content-disposition", "")
+        assert response.content[:4] == b"%PDF"
+
     def test_status_ready(self, client: TestClient) -> None:
         assert client.get("/api/status").json() == {"status": "ready", "detail": ""}
 
