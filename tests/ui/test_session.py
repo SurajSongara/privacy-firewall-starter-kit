@@ -190,6 +190,33 @@ class TestReviewSession:
         boxes = {(round(e.detection.bbox.y0), round(e.detection.bbox.y1)) for e in entries}
         assert len(boxes) == 2
 
+    def test_mark_substring_bbox_is_glyph_exact_on_proportional_font(self, tmp_path: Path) -> None:
+        # helv is proportional: uniform interpolation would misplace the
+        # box; real glyph boundaries from rawdict must match search_for.
+        path = tmp_path / "prop.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 100), "File WilliamMcIlvanney_GenAI_v2b.pdf end", fontsize=12)
+        expected = page.search_for("GenAI")[0]
+        doc.save(str(path))
+        doc.close()
+
+        session = ReviewSession(path, BUILTIN_POLICIES["share-with-ai"])
+        [entry] = session.mark_text("GenAI", "KEYWORD").added
+        bbox = entry.detection.bbox
+        assert abs(bbox.x0 - expected.x0) < 0.5
+        assert abs(bbox.x1 - expected.x1) < 0.5
+
+    def test_page_words_carry_char_boundaries(self, session: ReviewSession) -> None:
+        words = session.page_words(1)
+        with_cx = [w for w in words if "cx" in w]
+        assert with_cx, "native document words should expose char boundaries"
+        for w in with_cx:
+            assert len(w["cx"]) == len(w["text"]) + 1
+            assert w["cx"] == sorted(w["cx"])
+            assert abs(w["cx"][0] - w["x0"]) < 1.0
+            assert abs(w["cx"][-1] - w["x1"]) < 1.0
+
     def test_mark_text_case_sensitive(self, session: ReviewSession) -> None:
         entries = session.mark_text("Ramesh Kumar", "NAME", case_sensitive=True).added
         assert len(entries) == 1

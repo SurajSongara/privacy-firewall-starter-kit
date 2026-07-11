@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import fitz
+
 from privacy_firewall.detectors import (
     AadhaarDetector,
     AccountDetector,
@@ -92,6 +94,7 @@ class ReviewSession:
         self.auto = auto
         self.ocr_provider = ocr_provider
         self._page_cache: dict[int, bytes] = {}
+        self._char_words_cache: dict[int, dict[str, list[dict[str, Any]]]] = {}
         self._preview_pdf: bytes | None = None
         self._preview_key: int | None = None
         self._document: Document | None = None
@@ -315,7 +318,10 @@ class ReviewSession:
 
         Returns:
             One dict per word: ``{"text", "x0", "y0", "x1", "y1"}`` in
-            PDF coordinates.
+            PDF coordinates, plus ``"cx"`` — the ``len(text) + 1``
+            character boundary x-positions — when the word could be
+            matched to the PDF's own text layer (native text; OCR words
+            have no reliable per-character geometry).
 
         Raises:
             ValueError: If the page does not exist.
@@ -323,12 +329,17 @@ class ReviewSession:
         for page in self.document.pages:
             if page.page_number != page_number:
                 continue
-            return [
-                {"text": span.text, **span.bbox.model_dump()}
-                for block in page.blocks
-                if isinstance(block, TextBlock)
-                for span in block.spans
-            ]
+            words: list[dict[str, Any]] = []
+            for block in page.blocks:
+                if not isinstance(block, TextBlock):
+                    continue
+                for span in block.spans:
+                    word: dict[str, Any] = {"text": span.text, **span.bbox.model_dump()}
+                    boundaries = self._char_boundaries(page_number, span.text, span.bbox)
+                    if boundaries is not None:
+                        word["cx"] = boundaries
+                    words.append(word)
+            return words
         msg = f"page {page_number} not found"
         raise ValueError(msg)
 
@@ -390,7 +401,9 @@ class ReviewSession:
                         detection_type=normalized_label,
                         text=match.group(),
                         span=Span(start=base + match.start(), end=base + match.end()),
-                        bbox=self._char_range_bbox(block, match.start(), match.end()),
+                        bbox=self._char_range_bbox(
+                            page.page_number, block, match.start(), match.end()
+                        ),
                         page_number=page.page_number,
                         confidence=1.0,
                         reasons=("marked as PII by the reviewer",),
@@ -437,14 +450,17 @@ class ReviewSession:
         self.plan.entries.remove(entry)
         return True
 
-    @staticmethod
-    def _char_range_bbox(block: TextBlock, start: int, end: int) -> BoundingBox:
+    def _char_range_bbox(
+        self, page_number: int, block: TextBlock, start: int, end: int
+    ) -> BoundingBox:
         """Bounding box for a character range of ``block.text``.
 
         Unlike :meth:`TextBlock.bbox_for_span`, offsets are aligned to
         ``block.text`` (which joins words with separators) by locating
-        each word in the text, and partially covered words are clipped
-        horizontally in proportion to the covered characters.
+        each word in the text. Partially covered words are clipped at
+        real glyph boundaries from the PDF's text layer when available,
+        falling back to proportional interpolation (exact only for
+        monospace) when the word has no per-character geometry (OCR).
         """
         if not block.spans:
             return block.bbox
@@ -465,17 +481,92 @@ class ReviewSession:
             if overlap_start >= overlap_end:
                 continue
             found = True
-            width = span.bbox.x1 - span.bbox.x0
-            frac_start = (overlap_start - offset) / len(span.text)
-            frac_end = (overlap_end - offset) / len(span.text)
-            x0 = min(x0, span.bbox.x0 + frac_start * width)
-            x1 = max(x1, span.bbox.x0 + frac_end * width)
+            rel_start = overlap_start - offset
+            rel_end = overlap_end - offset
+            boundaries = self._char_boundaries(page_number, span.text, span.bbox)
+            if boundaries is not None:
+                x0 = min(x0, boundaries[rel_start])
+                x1 = max(x1, boundaries[rel_end])
+            else:
+                width = span.bbox.x1 - span.bbox.x0
+                x0 = min(x0, span.bbox.x0 + rel_start / len(span.text) * width)
+                x1 = max(x1, span.bbox.x0 + rel_end / len(span.text) * width)
             y0 = min(y0, span.bbox.y0)
             y1 = max(y1, span.bbox.y1)
 
         if not found:
             return block.bbox
         return BoundingBox(x0=x0, y0=y0, x1=x1, y1=y1)
+
+    def _char_boundaries(
+        self, page_number: int, text: str, bbox: BoundingBox
+    ) -> list[float] | None:
+        """Character boundary x-positions for one word, if the PDF knows them.
+
+        Matches the word against the PDF text layer's per-character
+        geometry by text and position. Returns ``len(text) + 1``
+        ascending x-values (glyph left edges plus the final right edge),
+        or ``None`` for words the text layer cannot vouch for (OCR
+        words, or ligature/encoding mismatches).
+        """
+        candidates = self._page_char_words(page_number).get(text)
+        if not candidates:
+            return None
+        for entry in candidates:
+            if abs(entry["x0"] - bbox.x0) <= 2.0 and abs(entry["y0"] - bbox.y0) <= 2.0:
+                boundaries: list[float] = entry["cx"]
+                if len(boundaries) == len(text) + 1:
+                    return boundaries
+        return None
+
+    def _page_char_words(self, page_number: int) -> dict[str, list[dict[str, Any]]]:
+        """Whitespace-delimited words with per-char geometry, keyed by text.
+
+        Built once per page from PyMuPDF's ``rawdict`` of the source PDF
+        (same extraction family as ``get_text("words")``, so word texts
+        line up with the parser's spans on native documents).
+        """
+        cached = self._char_words_cache.get(page_number)
+        if cached is not None:
+            return cached
+
+        index: dict[str, list[dict[str, Any]]] = {}
+        try:
+            with fitz.open(str(self.pdf_path)) as doc:
+                raw = doc[page_number - 1].get_text("rawdict")
+        except Exception:  # noqa: BLE001 - char geometry is best-effort
+            self._char_words_cache[page_number] = index
+            return index
+
+        def flush(chars: list[tuple[str, tuple[float, float, float, float]]]) -> None:
+            if not chars:
+                return
+            word_text = "".join(c for c, _ in chars)
+            rects = [r for _, r in chars]
+            entry = {
+                "x0": min(r[0] for r in rects),
+                "y0": min(r[1] for r in rects),
+                "cx": [r[0] for r in rects] + [max(r[2] for r in rects)],
+            }
+            index.setdefault(word_text, []).append(entry)
+
+        for raw_block in raw.get("blocks", []):
+            if raw_block.get("type") != 0:
+                continue
+            for line in raw_block.get("lines", []):
+                for raw_span in line.get("spans", []):
+                    pending: list[tuple[str, tuple[float, float, float, float]]] = []
+                    for char in raw_span.get("chars", []):
+                        c = char.get("c", "")
+                        if not c or c.isspace():
+                            flush(pending)
+                            pending = []
+                            continue
+                        pending.append((c, tuple(char["bbox"])))
+                    flush(pending)
+
+        self._char_words_cache[page_number] = index
+        return index
 
     def page_png(self, page_number: int) -> bytes:
         """Rendered PNG for a page (cached per session)."""

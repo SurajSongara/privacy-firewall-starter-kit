@@ -724,8 +724,13 @@ function layoutTextLayer(p, wrap) {
     el.style.fontSize = Math.max(h * 0.85, 4) + "px";
     el.style.lineHeight = h + "px";
     layer.appendChild(el);
+    // fr: character boundary positions as fractions of the word width
+    // (from the PDF's real glyph geometry) — null for OCR words.
+    const width = w.x1 - w.x0;
+    const fr = (w.cx && width > 0 && w.cx.length === w.text.length + 1)
+      ? w.cx.map(v => (v - w.x0) / width) : null;
     items.push({el: el, x: w.x0 * scale, y: w.y0 * scale,
-                w: (w.x1 - w.x0) * scale, h: h});
+                w: (w.x1 - w.x0) * scale, h: h, fr: fr});
   }
   const widths = items.map(it => it.el.offsetWidth);   // batch reads
   items.forEach((it, i) => {                            // then batch writes
@@ -843,11 +848,21 @@ function dragRect(e) {
           w: Math.abs(x1 - drag.x0), h: Math.abs(y1 - drag.y0)};
 }
 
+function nearestBoundary(fr, f) {
+  let best = 0, dist = Infinity;
+  for (let i = 0; i < fr.length; i++) {
+    const d = Math.abs(fr[i] - f);
+    if (d < dist) { dist = d; best = i; }
+  }
+  return best;
+}
+
 function highlightRect(rect) {
   // Words fully inside the band are selected whole; words the band's left
-  // or right edge cuts through are clipped to a character range, mapped
-  // proportionally (exact for monospace text, ~1 char off otherwise —
-  // the popup lets the reviewer trim the text before marking).
+  // or right edge cuts through are clipped to a character range. Words
+  // with real glyph boundaries (it.fr, from the PDF text layer) snap to
+  // the nearest glyph edge; OCR words fall back to proportional mapping
+  // (exact for monospace — the popup lets the reviewer trim anyway).
   const items = LAYOUT[drag.page] || [];
   for (const it of items) {
     const hit = it.x < rect.x + rect.w && it.x + it.w > rect.x &&
@@ -855,15 +870,23 @@ function highlightRect(rect) {
     const len = it.el.textContent.length;
     let from = 0, to = 0;
     if (hit && len > 0 && it.w > 0) {
-      from = Math.max(0, Math.round((rect.x - it.x) / it.w * len));
-      to = Math.min(len, Math.round((rect.x + rect.w - it.x) / it.w * len));
+      const f0 = (rect.x - it.x) / it.w;
+      const f1 = (rect.x + rect.w - it.x) / it.w;
+      if (it.fr) {
+        from = nearestBoundary(it.fr, f0);
+        to = nearestBoundary(it.fr, f1);
+      } else {
+        from = Math.max(0, Math.round(f0 * len));
+        to = Math.min(len, Math.round(f1 * len));
+      }
     }
     const sel = to > from;
     it.selFrom = sel ? from : null;
     it.selTo = sel ? to : null;
     it.el.classList.toggle("sel", sel);
     if (sel && (from > 0 || to < len)) {
-      const f0 = from / len * 100, f1 = to / len * 100;
+      const f0 = (it.fr ? it.fr[from] : from / len) * 100;
+      const f1 = (it.fr ? it.fr[to] : to / len) * 100;
       it.el.style.background = `linear-gradient(90deg, transparent ${f0}%, ` +
         `rgba(99,102,241,.35) ${f0}% ${f1}%, transparent ${f1}%)`;
     } else {
