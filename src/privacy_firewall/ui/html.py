@@ -24,11 +24,15 @@ PAGE_HTML = r"""<!doctype html>
 
   /* ---------- header ---------- */
   header {
-    display: flex; align-items: center; gap: 12px; padding: 10px 20px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 20px;
     background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 30;
   }
+  /* Controls never shrink or clip — the row wraps instead; only the
+     file-path meta is allowed to compress (and hides when tight). */
+  header > :not(.meta) { flex-shrink: 0; }
+  @media (max-width: 1500px) { header .meta { display: none; } }
   .logo { display: flex; align-items: center; gap: 9px; }
   .logo svg { width: 24px; height: 24px; flex-shrink: 0; }
   .logo .name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
@@ -80,9 +84,15 @@ PAGE_HTML = r"""<!doctype html>
 
   /* ---------- banner / hint ---------- */
   #banner {
-    display: none; padding: 10px 20px; background: #ecfdf5; color: #065f46;
+    display: none; align-items: center; gap: 12px; padding: 10px 20px;
+    background: #ecfdf5; color: #065f46;
     border-bottom: 1px solid #a7f3d0; font-weight: 600; word-break: break-all; font-size: 13px;
   }
+  #banner a.view {
+    flex-shrink: 0; text-decoration: none; background: #059669; color: #fff;
+    border-radius: 8px; padding: 6px 14px; font-size: 12.5px; font-weight: 700;
+  }
+  #banner a.view:hover { filter: brightness(1.08); }
   #preview-banner {
     display: none; padding: 8px 20px; background: #fdf4ff; color: #86198f;
     border-bottom: 1px solid #f5d0fe; font-weight: 600; font-size: 13px;
@@ -120,7 +130,7 @@ PAGE_HTML = r"""<!doctype html>
   /* ---------- layout ---------- */
   main { display: flex; gap: 20px; padding: 20px; align-items: flex-start; justify-content: center; }
   #sidebar { width: 370px; flex-shrink: 0; position: sticky; top: 66px; max-height: calc(100vh - 96px); overflow-y: auto; padding-bottom: 8px; }
-  #pages { flex: 1; min-width: 0; }
+  #pages { flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 8px; }
 
   /* ---------- search-to-mark card ---------- */
   #marker-card {
@@ -569,15 +579,17 @@ function initPages() {
   const el = document.getElementById("pages");
   el.innerHTML = "";
   Object.keys(LAYOUT).forEach(k => delete LAYOUT[k]);
+  ZOOM = Math.min(1, fitZoom());   // start at 100% or fit-width, whichever is smaller
+  document.getElementById("zoom-val").textContent = Math.round(ZOOM * 100) + "%";
   PLAN.pages.forEach(p => {
     const label = document.createElement("div");
     label.className = "page-label";
     label.textContent = "Page " + p.page_number + " / " + PLAN.pages.length;
-    label.style.maxWidth = (BASE_WIDTH * ZOOM) + "px";
+    label.style.width = (BASE_WIDTH * ZOOM) + "px";
     const wrap = document.createElement("div");
     wrap.className = "page-wrap";
     wrap.dataset.page = p.page_number;
-    wrap.style.maxWidth = (BASE_WIDTH * ZOOM) + "px";
+    wrap.style.width = (BASE_WIDTH * ZOOM) + "px";
     const img = document.createElement("img");
     img.src = pageSrc(p.page_number);
     img.alt = "page " + p.page_number;
@@ -725,19 +737,23 @@ window.addEventListener("resize", () => {
 
 /* ---------- zoom + page navigation ---------- */
 
+function fitZoom() {
+  // clientWidth of the (padding-free) pages column; keep within zoom bounds
+  return Math.min(2.5, Math.max(0.6, document.getElementById("pages").clientWidth / BASE_WIDTH));
+}
+
 function setZoom(z) {
   ZOOM = Math.min(2.5, Math.max(0.6, z));
   document.getElementById("zoom-val").textContent = Math.round(ZOOM * 100) + "%";
+  // Explicit width (not max-width) so zooming past the column width
+  // actually enlarges the page; #pages scrolls horizontally.
   document.querySelectorAll(".page-wrap, .page-label").forEach(el =>
-    el.style.maxWidth = (BASE_WIDTH * ZOOM) + "px");
+    el.style.width = (BASE_WIDTH * ZOOM) + "px");
   relayoutAll();
 }
 document.getElementById("zoom-in").addEventListener("click", () => setZoom(ZOOM + 0.15));
 document.getElementById("zoom-out").addEventListener("click", () => setZoom(ZOOM - 0.15));
-document.getElementById("zoom-fit").addEventListener("click", () => {
-  const pages = document.getElementById("pages");
-  setZoom(pages.clientWidth / BASE_WIDTH);
-});
+document.getElementById("zoom-fit").addEventListener("click", () => setZoom(fitZoom()));
 
 let currentPage = 1;
 let pageObserver = null;
@@ -984,9 +1000,12 @@ document.getElementById("apply").addEventListener("click", async () => {
     const style = document.getElementById("style").value;
     const result = await api("api/apply", {redaction_type: style});
     const banner = document.getElementById("banner");
-    banner.style.display = "block";
-    banner.textContent = `Redacted PDF written: ${result.output_path} ` +
-      `(${result.redactions} redactions). Review record: ${result.plan_path}`;
+    banner.style.display = "flex";
+    banner.innerHTML =
+      `<span>Redacted PDF written: ${esc(result.output_path)} ` +
+      `(${result.redactions} redaction${result.redactions === 1 ? "" : "s"}).</span>` +
+      `<a class="view" href="api/output" target="_blank" rel="noopener">View redacted PDF</a>`;
+    toast("Done — click “View redacted PDF” to inspect the result.");
   } catch (err) {
     toast("Apply failed: " + err.message, "warn");
   } finally {
