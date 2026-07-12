@@ -18,6 +18,11 @@ dependencies = [
 ocr = [
     "paddleocr>=2.8",
 ]
+ocr-lite = [
+    # PaddleOCR models via ONNX Runtime: pure-wheel install, models bundled,
+    # no system binary. The recommended OCR backend for packaged builds.
+    "rapidocr-onnxruntime>=1.3",
+]
 ui = [
     "fastapi>=0.110",
     "uvicorn>=0.30",

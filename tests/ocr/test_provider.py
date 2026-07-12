@@ -8,7 +8,12 @@ import pytest
 from privacy_firewall.models.blocks import TextBlock
 from privacy_firewall.models.document import Document, Page
 from privacy_firewall.models.geometry import BoundingBox
-from privacy_firewall.ocr import OCRProvider, OCRProviderRegistry
+from privacy_firewall.ocr import (
+    OCR_ENGINE_ENV_VAR,
+    OCRProvider,
+    OCRProviderRegistry,
+    _resolve_default,
+)
 
 
 class _DummyProvider(OCRProvider):
@@ -122,3 +127,101 @@ class TestOCRProviderRegistry:
         r.register(_DummyProvider)
         r.register(_V2)
         assert r.get("dummy") is _V2
+
+
+class _RapidDummy(_DummyProvider):
+    name = "rapidocr"
+
+
+class _TesseractDummy(_DummyProvider):
+    name = "tesseract"
+
+
+class _PaddleDummy(_DummyProvider):
+    name = "paddleocr"
+
+
+class TestDefaultResolution:
+    """The default engine is deterministic: env var, then preference order."""
+
+    def test_prefers_rapidocr_over_tesseract(self) -> None:
+        r = OCRProviderRegistry()
+        r.register(_TesseractDummy)
+        r.register(_RapidDummy)
+        _resolve_default(r, None)
+        assert r.default_name == "rapidocr"
+
+    def test_registration_order_does_not_matter(self) -> None:
+        r = OCRProviderRegistry()
+        r.register(_RapidDummy)
+        r.register(_TesseractDummy)
+        _resolve_default(r, None)
+        assert r.default_name == "rapidocr"
+
+    def test_falls_back_to_tesseract_then_paddle(self) -> None:
+        r = OCRProviderRegistry()
+        r.register(_PaddleDummy)
+        r.register(_TesseractDummy)
+        _resolve_default(r, None)
+        assert r.default_name == "tesseract"
+
+    def test_env_var_overrides_preference(self) -> None:
+        r = OCRProviderRegistry()
+        r.register(_RapidDummy)
+        r.register(_TesseractDummy)
+        _resolve_default(r, "tesseract")
+        assert r.default_name == "tesseract"
+
+    def test_env_var_is_case_insensitive(self) -> None:
+        r = OCRProviderRegistry()
+        r.register(_TesseractDummy)
+        _resolve_default(r, "  Tesseract ")
+        assert r.default_name == "tesseract"
+
+    def test_unknown_env_var_warns_and_falls_back(self) -> None:
+        r = OCRProviderRegistry()
+        r.register(_TesseractDummy)
+        with pytest.warns(UserWarning, match=OCR_ENGINE_ENV_VAR):
+            _resolve_default(r, "nonexistent")
+        assert r.default_name == "tesseract"
+
+    def test_unlisted_engine_keeps_registration_default(self) -> None:
+        # A third-party engine outside the preference list stays default
+        # when nothing in the preference list is registered.
+        r = OCRProviderRegistry()
+        r.register(_DummyProvider)
+        _resolve_default(r, None)
+        assert r.default_name == "dummy"
+
+    def test_empty_registry_is_a_no_op(self) -> None:
+        r = OCRProviderRegistry()
+        _resolve_default(r, None)
+        assert r.default_name is None
+
+    def test_skips_registered_but_unavailable_engine(self) -> None:
+        # Adapters lazy-import their backend, so registration alone does
+        # not prove the engine can run; the preference scan must skip it.
+        class _RapidMissing(_RapidDummy):
+            @classmethod
+            def is_available(cls) -> bool:
+                return False
+
+        r = OCRProviderRegistry()
+        r.register(_RapidMissing)
+        r.register(_TesseractDummy)
+        _resolve_default(r, None)
+        assert r.default_name == "tesseract"
+
+    def test_env_pin_honoured_even_if_unavailable(self) -> None:
+        # An explicit pin should surface the adapter's install-hint
+        # ImportError at run time rather than silently falling back.
+        class _PaddleMissing(_PaddleDummy):
+            @classmethod
+            def is_available(cls) -> bool:
+                return False
+
+        r = OCRProviderRegistry()
+        r.register(_PaddleMissing)
+        r.register(_TesseractDummy)
+        _resolve_default(r, "paddleocr")
+        assert r.default_name == "paddleocr"
