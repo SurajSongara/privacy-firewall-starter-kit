@@ -22,6 +22,13 @@ class RapidOCRAdapter(OCRProvider):
 
     name = "rapidocr"
 
+    @classmethod
+    def is_available(cls) -> bool:
+        """Whether the ``rapidocr-onnxruntime`` backend is importable."""
+        from importlib.util import find_spec
+
+        return find_spec("rapidocr_onnxruntime") is not None
+
     def __init__(self, dpi: int = 200, lang: str = "en") -> None:
         """Initialise the adapter.
 

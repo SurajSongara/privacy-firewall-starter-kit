@@ -27,6 +27,13 @@ class PaddleOCRAdapter(OCRProvider):
 
     name = "paddleocr"
 
+    @classmethod
+    def is_available(cls) -> bool:
+        """Whether both ``paddleocr`` and its ``paddle`` backend are importable."""
+        from importlib.util import find_spec
+
+        return find_spec("paddleocr") is not None and find_spec("paddle") is not None
+
     def __init__(self, dpi: int = 200, lang: str = "en", use_angle_cls: bool = True) -> None:
         """Initialise the adapter with PaddleOCR configuration.
 

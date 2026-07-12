@@ -31,6 +31,13 @@ class TesseractOCRAdapter(OCRProvider):
 
     name = "tesseract"
 
+    @classmethod
+    def is_available(cls) -> bool:
+        """Whether the ``tesserocr`` backend is importable."""
+        from importlib.util import find_spec
+
+        return find_spec("tesserocr") is not None
+
     def __init__(
         self,
         dpi: int = 200,

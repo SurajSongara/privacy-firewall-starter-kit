@@ -18,6 +18,20 @@ class OCRProvider(ABC):
 
     name: str = ""
 
+    @classmethod
+    def is_available(cls) -> bool:
+        """Whether the engine's backend can actually run on this machine.
+
+        Adapters import their backend lazily, so registration alone does
+        not prove the backend package is installed. Adapters override
+        this with a cheap check (``importlib.util.find_spec``); default
+        selection only considers engines that report available.
+
+        Returns:
+            ``True`` if the backing OCR package is importable.
+        """
+        return True
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Ensure every concrete subclass defines a non-empty ``name``."""
         super().__init_subclass__(**kwargs)
