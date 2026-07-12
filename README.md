@@ -1,63 +1,150 @@
 # Privacy Firewall
 
-Offline-first PII Detection & Redaction Engine.
+**Offline-first PII detection & redaction for documents.**
 
-Detect and redact sensitive information from PDF documents — entirely offline.
+Detect and physically remove sensitive information from PDFs, images, and text documents — entirely on your machine. No cloud, no API keys, no telemetry. The web UI binds to `127.0.0.1` only; nothing ever leaves your computer.
 
-## Features
+![Original vs redacted bank statement](docs/screenshots/before-after.png)
 
-- **7 detectors**: PAN, Aadhaar, Email, Phone, UPI, IFSC, Account Number
-- **Destructive redaction**: Text is physically stripped from the PDF content stream (not just visually overlaid)
-- **Values-only mode**: Redact only the PII value while preserving labels (`--values-only`)
-- **Priority-based fusion**: Overlapping detections resolved by detector priority tiers
-- **OCR support**: RapidOCR integration for scanned documents
-- **CLI-first**: Zero business logic in the CLI — all work delegated to engine components
+*All values in the screenshots are synthetic — the account, PAN, Aadhaar, and person are fictitious.*
 
-## Quick Start
+## Highlights
+
+- **8 detectors** — PAN, Aadhaar, Email, Phone, UPI, IFSC, Account Number, and person Names (corroborated from email handles and profile slugs)
+- **True redaction** — matched text is stripped from the PDF content stream via redaction annotations, not just painted over; copy-paste and text extraction find nothing
+- **Review Studio** — a local web UI to review every detection, see *why* it matched, drag-select anything the detectors missed (even part of a word), and export
+- **Workspace memory** — mark a term once with "remember", and it's flagged in every document in the workspace
+- **Evidence & confidence** — every detection carries the matched text, location, a confidence score, and a human-readable reason
+- **OCR for scans** — RapidOCR / Tesseract / PaddleOCR backends with automatic native-vs-OCR-vs-hybrid pipeline selection
+- **Multi-format** — PDFs natively; images (PNG, JPG, TIFF, BMP, WebP, GIF), TXT, MD, and DOCX are converted on upload
+- **Deterministic engine** — regex + validators (Verhoeff, structural checks) before any AI; fully offline, reproducible, and benchmarked at 100 % precision/recall on the bundled synthetic corpus
+
+## Installation
+
+Requires **Python ≥ 3.12**.
 
 ```bash
-pip install -e ".[dev]"
-
-# Scan — show document structure
-python -m privacy_firewall scan input.pdf
-
-# Detect — find PII
-python -m privacy_firewall detect input.pdf
-
-# Redact — produce a redacted copy
-python -m privacy_firewall redact input.pdf output.pdf
-
-# Values-only redaction — keep labels, redact only values
-python -m privacy_firewall redact input.pdf output.pdf --values-only
+git clone https://github.com/SurajSongara/privacy-firewall-starter-kit.git
+cd privacy-firewall-starter-kit
+pip install -e ".[ui,ocr-lite]"
 ```
 
-## Project Structure
+| Extra | What it adds |
+|---|---|
+| `ui` | The review Studio web UI (FastAPI + uvicorn) |
+| `ocr-lite` | **Recommended OCR backend** — RapidOCR via ONNX Runtime: pure wheels, models bundled, no system binary |
+| `ocr` | PaddleOCR backend (needs `paddlepaddle`, which has no Python 3.14 wheel yet) |
+| `docx` | DOCX upload support |
+| `dev` | pytest, ruff, mypy, pre-commit |
+
+Tesseract is also supported if you have `tesserocr` and a tessdata directory installed.
+
+## Quick start — Studio (web UI)
+
+```bash
+# Launch the Studio dashboard on a folder of documents
+python -m privacy_firewall --workspace ~/Documents/statements
+
+# Or review a single file
+python -m privacy_firewall review statement.pdf
+```
+
+Your browser opens a local dashboard listing every document in the workspace. Drop new files onto it (PDF, images, TXT, MD, DOCX) — they're saved into the workspace folder and stay on your computer.
+
+![Studio dashboard](docs/screenshots/studio-dashboard.png)
+
+Open a document to review what was found:
+
+![Review UI with detections](docs/screenshots/review-ui.png)
+
+In the review screen you can:
+
+- **Triage** — every detection shows its evidence and reason; toggle redact/keep per item or per type, with keyboard shortcuts (`n`/`p` to jump between items needing review, `r` redact, `k` keep)
+- **Mark anything** — drag a box over any text on the page (even part of a word) or type a term in the sidebar to mark every instance in the document
+- **Remember terms** — tick *"Remember for every document in this workspace"* and the term is flagged in every other document, now and later
+- **Preview** — see exactly what the exported PDF will look like before committing
+- **Apply & export** — writes a `.redacted.pdf` next to the original; the review plan is saved as JSON alongside it
+
+## Quick start — CLI
+
+```bash
+# Show document structure
+python -m privacy_firewall scan statement.pdf
+
+# List all PII detections with evidence and confidence
+python -m privacy_firewall detect statement.pdf
+
+# Produce a redacted copy (values-only by default: labels stay, values go)
+python -m privacy_firewall redact statement.pdf statement.redacted.pdf
+
+# Redaction styles: replace (***), black-bar, or highlight
+python -m privacy_firewall redact statement.pdf out.pdf --type black-bar
+
+# Scanned document? Force OCR, or let diagnostics decide
+python -m privacy_firewall detect scan.pdf --ocr
+python -m privacy_firewall detect scan.pdf --auto
+
+# Health report: text quality, layout, OCR recommendation
+python -m privacy_firewall doctor statement.pdf
+```
+
+Common flags:
+
+| Flag | Commands | Effect |
+|---|---|---|
+| `--ocr` / `--auto` | scan, detect, redact, review | Force OCR, or let diagnostics pick native/OCR/hybrid |
+| `--ocr-engine <name>` | scan, detect, redact, review | Pick a specific engine: `rapidocr`, `tesseract`, `paddleocr` |
+| `--values-only` / `--full-block` | redact | Redact just the PII value vs. the whole text block |
+| `--type <style>` | redact | `replace`, `black-bar`, or `highlight` |
+| `--detector <name>` | detect | Run a single detector |
+
+The default OCR engine is chosen deterministically: the `PRIVACY_FIREWALL_OCR_ENGINE` environment variable wins, otherwise the first *available* engine in the order `rapidocr > tesseract > paddleocr`.
+
+## How it works
+
+```
+PDFParser ──► OCRProvider (optional) ──► HybridMerger ──► Detectors (8)
+                                                              │
+   new PDF ◄── PDFRenderer ◄── RedactionPlanner ◄── DecisionEngine ◄── FusionEngine
+```
+
+- Each stage exchanges immutable Pydantic v2 models — the engine has zero framework dependencies, and the CLI/UI are thin wrappers around it.
+- Detectors are pure functions `(Document) → list[Detection]`, individually testable, with priority tiers (`regex > validator > heuristic > ner > llm`) used by the fusion engine to resolve overlaps.
+- A context scorer adjusts confidence using the surrounding line (e.g. a 10-digit number on a line mentioning *UTR* is not a phone number), and a policy maps confidence to *redact / ask / keep* suggestions.
+- Redaction uses PyMuPDF's `apply_redactions()` — the text is removed from the content stream. The original file is never modified; output always goes to a new path.
+
+## Project structure
 
 ```
 src/privacy_firewall/
-├── __main__.py          # Typer CLI entry point
-├── cli/                 # CLI commands (scan, detect, redact) — zero logic
-├── models/              # Pydantic v2 frozen models
-├── parsers/             # PyMuPDF PDF parser
-├── detectors/           # BaseDetector ABC, registry, 7 detectors
-├── engine/              # Fusion engine + redaction planner
-└── renderer/            # PDF renderer (destructive redaction)
+├── __main__.py        # Typer CLI (studio is the default command)
+├── cli/               # One file per subcommand — zero business logic
+├── models/            # Frozen Pydantic v2 models (Document, Detection, …)
+├── parsers/           # PyMuPDF PDF parser
+├── ocr/               # OCR provider registry + Tesseract/Paddle/RapidOCR adapters
+├── detectors/         # 8 detectors + registry + dedup utilities
+├── engine/            # Context scoring, fusion, decision, redaction planning
+├── diagnostics/       # Text-quality analysis + pipeline recommendation
+├── layout/            # Header/footer/paragraph classification
+├── bank_profiler/     # Per-bank statement profiles (SBI, HDFC, ICICI, Axis)
+├── renderer/          # Destructive PDF renderer
+└── ui/                # Review Studio (FastAPI, localhost only)
 
-examples/                # Golden dataset for benchmarking
-tests/                   # 231 tests (pytest, --cov)
+benchmarks/            # Precision benchmark vs. golden synthetic corpus
+examples/synthetic/    # Golden dataset (all values fabricated)
+tests/                 # 638 tests (pytest)
 ```
 
-## Current Status
+## Development
 
-Phase 1 complete. 231 tests, ruff clean, mypy clean.
-See `.ai/CURRENT_STATE.md` for the latest status.
+```bash
+pip install -e ".[dev,ui]"
+pytest                      # full suite
+ruff check src/ tests/      # lint
+mypy src/                   # strict type-checking
+python -m benchmarks.precision   # precision/recall vs. the golden corpus
+```
 
-## Success Criteria
+## Privacy
 
-1. ✅ Parse PDFs
-2. ✅ Detect Indian PII (PAN, Aadhaar, Email, Phone, UPI)
-3. ✅ Produce redaction plan
-4. ✅ Export redacted PDF (destructive, values-only mode)
-5. ⏳ Achieve high benchmark recall (dataset + runner pending)
-
-Start with `.ai/START_HERE.md`.
+This tool exists to keep your documents private, and it practices what it preaches: no network calls, no telemetry, no cloud OCR. The web UI binds to `127.0.0.1` only. Everything — parsing, OCR, detection, redaction — runs locally.
