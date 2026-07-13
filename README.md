@@ -106,7 +106,10 @@ Common flags:
 | `--type <style>` | redact, redact-batch | `replace`, `black-bar`, or `highlight` |
 | `--certificate` | redact, redact-batch | Verify the output and write an audit certificate |
 | `--out <dir>` | redact-batch | Write redacted copies into a separate folder |
+| `--password <pw>` | scan, detect, redact, redact-batch, doctor, review | Open a password-protected (encrypted) PDF |
 | `--detector <name>` | detect | Run a single detector |
+
+Password-protected PDFs are supported everywhere: pass `--password` on the CLI (or omit it and you'll be prompted securely), and in Studio you'll get an unlock prompt when you open an encrypted document. The password is held in memory only, and the redacted output is written **unencrypted** so it can be shared.
 
 The default OCR engine is chosen deterministically: the `PRIVACY_FIREWALL_OCR_ENGINE` environment variable wins, otherwise the first *available* engine in the order `rapidocr > tesseract > paddleocr`.
 

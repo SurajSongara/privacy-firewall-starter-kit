@@ -77,6 +77,13 @@ def batch_cmd(
             help="Verify each output leaks no redacted PII and write a certificate.",
         ),
     ] = False,
+    password: Annotated[
+        str | None,
+        typer.Option(
+            "--password",
+            help="Password applied to every encrypted PDF in the folder.",
+        ),
+    ] = None,
 ) -> None:
     """Redact every supported document in a folder, writing a summary report.
 
@@ -113,6 +120,7 @@ def batch_cmd(
                     auto=auto,
                     ocr_engine=ocr_engine,
                     certificate=certificate,
+                    password=password,
                 )
             )
 
@@ -147,6 +155,7 @@ def _process_one(
     auto: bool,
     ocr_engine: str | None,
     certificate: bool,
+    password: str | None,
 ) -> _Row:
     """Redact one document; never raises — records the error on the row."""
     row = _Row(file=src.name)
@@ -165,6 +174,7 @@ def _process_one(
             auto=auto,
             ocr_provider=ocr_engine,
             values_only=values_only,
+            password=password,
         )
         row.redactions = len(detections)
         row.types = _counts(detections)
