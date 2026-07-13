@@ -10,8 +10,10 @@ Detect and physically remove sensitive information from PDFs, images, and text d
 
 ## Highlights
 
-- **8 detectors** — PAN, Aadhaar, Email, Phone, UPI, IFSC, Account Number, and person Names (corroborated from email handles and profile slugs)
+- **9 detectors** — PAN, Aadhaar, Email, Phone, UPI, IFSC, Account Number, GSTIN, and person Names (corroborated from email handles and profile slugs)
 - **True redaction** — matched text is stripped from the PDF content stream via redaction annotations, not just painted over; copy-paste and text extraction find nothing
+- **Verifiable redaction** — `--certificate` re-parses the output, proves none of the redacted values are still extractable, and emits an audit certificate (input/output hashes, counts by type, PASS/FAIL) that contains no raw PII
+- **Batch mode** — `redact-batch` redacts a whole folder in one run and writes a CSV/JSON summary; originals are never touched
 - **Review Studio** — a local web UI to review every detection, see *why* it matched, drag-select anything the detectors missed (even part of a word), and export
 - **Workspace memory** — mark a term once with "remember", and it's flagged in every document in the workspace
 - **Evidence & confidence** — every detection carries the matched text, location, a confidence score, and a human-readable reason
@@ -77,6 +79,12 @@ python -m privacy_firewall detect statement.pdf
 # Produce a redacted copy (values-only by default: labels stay, values go)
 python -m privacy_firewall redact statement.pdf statement.redacted.pdf
 
+# Redact and prove it: writes <out>.certificate.{json,pdf}, exits non-zero on leak
+python -m privacy_firewall redact statement.pdf out.pdf --certificate
+
+# Redact a whole folder in one run, with a CSV/JSON summary
+python -m privacy_firewall redact-batch ./client-docs --out ./redacted --certificate
+
 # Redaction styles: replace (***), black-bar, or highlight
 python -m privacy_firewall redact statement.pdf out.pdf --type black-bar
 
@@ -92,10 +100,12 @@ Common flags:
 
 | Flag | Commands | Effect |
 |---|---|---|
-| `--ocr` / `--auto` | scan, detect, redact, review | Force OCR, or let diagnostics pick native/OCR/hybrid |
-| `--ocr-engine <name>` | scan, detect, redact, review | Pick a specific engine: `rapidocr`, `tesseract`, `paddleocr` |
-| `--values-only` / `--full-block` | redact | Redact just the PII value vs. the whole text block |
-| `--type <style>` | redact | `replace`, `black-bar`, or `highlight` |
+| `--ocr` / `--auto` | scan, detect, redact, redact-batch, review | Force OCR, or let diagnostics pick native/OCR/hybrid |
+| `--ocr-engine <name>` | scan, detect, redact, redact-batch, review | Pick a specific engine: `rapidocr`, `tesseract`, `paddleocr` |
+| `--values-only` / `--full-block` | redact, redact-batch | Redact just the PII value vs. the whole text block |
+| `--type <style>` | redact, redact-batch | `replace`, `black-bar`, or `highlight` |
+| `--certificate` | redact, redact-batch | Verify the output and write an audit certificate |
+| `--out <dir>` | redact-batch | Write redacted copies into a separate folder |
 | `--detector <name>` | detect | Run a single detector |
 
 The default OCR engine is chosen deterministically: the `PRIVACY_FIREWALL_OCR_ENGINE` environment variable wins, otherwise the first *available* engine in the order `rapidocr > tesseract > paddleocr`.
@@ -103,9 +113,11 @@ The default OCR engine is chosen deterministically: the `PRIVACY_FIREWALL_OCR_EN
 ## How it works
 
 ```
-PDFParser ──► OCRProvider (optional) ──► HybridMerger ──► Detectors (8)
+PDFParser ──► OCRProvider (optional) ──► HybridMerger ──► Detectors (9)
                                                               │
    new PDF ◄── PDFRenderer ◄── RedactionPlanner ◄── DecisionEngine ◄── FusionEngine
+     │
+     └──► Verifier (re-parse output, assert no leak) ──► Certificate
 ```
 
 - Each stage exchanges immutable Pydantic v2 models — the engine has zero framework dependencies, and the CLI/UI are thin wrappers around it.
@@ -122,7 +134,7 @@ src/privacy_firewall/
 ├── models/            # Frozen Pydantic v2 models (Document, Detection, …)
 ├── parsers/           # PyMuPDF PDF parser
 ├── ocr/               # OCR provider registry + Tesseract/Paddle/RapidOCR adapters
-├── detectors/         # 8 detectors + registry + dedup utilities
+├── detectors/         # 9 detectors + registry + dedup utilities
 ├── engine/            # Context scoring, fusion, decision, redaction planning
 ├── diagnostics/       # Text-quality analysis + pipeline recommendation
 ├── layout/            # Header/footer/paragraph classification
@@ -132,7 +144,7 @@ src/privacy_firewall/
 
 benchmarks/            # Precision benchmark vs. golden synthetic corpus
 examples/synthetic/    # Golden dataset (all values fabricated)
-tests/                 # 638 tests (pytest)
+tests/                 # 657 tests (pytest)
 ```
 
 ## Development

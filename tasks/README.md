@@ -93,6 +93,27 @@ Delivered:
 - `TermsStore` (`.privacy-firewall/terms.json`) — remembered marks suggested across all workspace documents, with keep-allowlist and workspace-wide forget
 - `NameDetector` — NAME candidates derived from email local parts, profile handles, and the title line; corroboration-based confidence, heuristic fusion tier
 
+## Phase 5 — CA Beachhead Pack (Complete ✅)
+
+Commit to a segment and build the features that turn the redaction gap into a daily tool for CA / tax practitioners: bulk processing, provable redaction, and one more India-specific identifier. (See `.claude/plans` beachhead decision record for the viability/competitor analysis behind this phase.)
+
+Principles: Provable redaction is the moat → Reuse the single-file pipeline for batch → Deterministic checksum detectors before AI
+
+| # | Task | Status |
+|---|------|--------|
+| F006 | Batch Redaction — `redact-batch <folder>` + CSV/JSON summary | ✅ Complete |
+| F007 | Verification Certificate — re-parse output, prove no leak, audit cert | ✅ Complete |
+| F008 | GSTIN Detector — 15-char format + base-36 checksum | ✅ Complete |
+
+Delivered:
+- `engine/redact.py` (`detect_document`/`redact_document`) — the detect→redact pipeline in one place; `redact` and `redact-batch` both reuse it
+- `redact-batch` — whole-folder redaction, never mutates originals, continue-on-error, `redaction-summary.{csv,json}`, non-zero exit on any error or failed verification
+- `engine/verification.py` — post-redaction proof (re-parse + re-detect) and a shareable `Certificate` (JSON + one-page PDF) with input/output hashes and counts by type, no raw PII; `--certificate` on `redact`/`redact-batch`
+- `GSTINDetector` — checksum-validated, registered via `ALL_DETECTORS`; precision benchmark unchanged (7 types still 100/100)
+- 9 detectors, 657 tests
+
+Not built (gated on demand validation): packaged desktop installer (GTM enabler), and any further "USP" features until the first CAs validate.
+
 ## Workflow
 
 1. Read `.ai/START_HERE.md`

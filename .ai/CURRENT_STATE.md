@@ -1,4 +1,4 @@
-Status: PHASE_4_COMPLETE — all F001–F005 shipped; 617 tests passing
+Status: PHASE_5_COMPLETE — all F006–F008 shipped; 657 tests passing
 
 ## Phase 1 — Core Engine (Complete)
 
@@ -70,8 +70,27 @@ F001–F005 (see `tasks/README.md` for the delivered list):
   profile handles, and the page-1 title line; two evidence kinds → 0.9,
   one → 0.6 (ask), title-only → nothing. Heuristic fusion tier.
 
+## Phase 5 — CA Beachhead Pack (Complete)
+
+Committed to the CA / tax-practitioner segment (see the beachhead decision record
+under `.claude/plans` for the viability + competitor teardown). F006–F008:
+
+- F006: `redact-batch <folder>` — whole-folder redaction reusing the single-file
+  pipeline (extracted to `engine/redact.py`), `redaction-summary.{csv,json}`,
+  continue-on-error, non-zero exit on any error or failed verification.
+- F007: `engine/verification.py` — re-parses the redacted output, proves no
+  redacted value is still extractable and no detector re-fires, and emits a
+  shareable `Certificate` (JSON + one-page PDF, no raw PII). `--certificate` on
+  `redact`/`redact-batch`.
+- F008: `GSTINDetector` — 15-char format + base-36 checksum + GST state code,
+  registered via the new `ALL_DETECTORS` single source of truth.
+
+Not built (gated on demand validation): packaged desktop installer (GTM enabler).
+
 ## Environment notes
 
-- Python >= 3.12 (project runs on 3.14); `paddlepaddle` has no 3.14 wheel, so
-  the PaddleOCR adapter fails to register — Tesseract is the working default.
-- 617 tests passing, ruff clean, mypy strict clean.
+- Python >= 3.12 (project runs on 3.14). Default OCR engine is resolved
+  deterministically (`PRIVACY_FIREWALL_OCR_ENGINE` env → `rapidocr > tesseract >
+  paddleocr`, skipping unavailable backends); `paddleocr` registers but reports
+  unavailable on 3.14 (no `paddlepaddle` wheel).
+- 9 detectors. 657 tests passing, ruff clean, mypy strict clean.
