@@ -5,11 +5,13 @@ from typing import Annotated
 
 import typer
 
+from privacy_firewall.cli._pdf import resolve_password
 from privacy_firewall.detectors import DetectorRegistry, build_registry
 from privacy_firewall.engine.context import ContextScorer
 from privacy_firewall.engine.decision import DecisionEngine, file_sha256
 from privacy_firewall.engine.fusion import FusionEngine
 from privacy_firewall.engine.ocr_pipeline import get_merged_document, get_pipeline_summary
+from privacy_firewall.parsers.pdf_open import EncryptedPDFError
 from privacy_firewall.policy import DEFAULT_POLICY_NAME, get_policy
 
 
@@ -89,11 +91,20 @@ def detect_cmd(
             help="Policy for plan suggestions: builtin name or a YAML/JSON file path.",
         ),
     ] = DEFAULT_POLICY_NAME,
+    password: Annotated[
+        str | None,
+        typer.Option("--password", help="Password for an encrypted (password-protected) PDF."),
+    ] = None,
 ) -> None:
     """Run PII detectors on a PDF and list all detections found."""
-    document, source = get_merged_document(
-        input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine,
-    )
+    pw = resolve_password(input_pdf, password)
+    try:
+        document, source = get_merged_document(
+            input_pdf, force_ocr=ocr, auto=auto, ocr_provider=ocr_engine, password=pw,
+        )
+    except EncryptedPDFError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
     registry = _build_registry(detector)
     result = registry.run_all(document, values_only=values_only)

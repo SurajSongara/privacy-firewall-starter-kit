@@ -26,6 +26,7 @@ def detect_document(
     ocr_provider: str | None = None,
     detector_names: list[str] | None = None,
     values_only: bool = True,
+    password: str | None = None,
 ) -> tuple[Document, list[Detection], str]:
     """Parse *pdf*, run detectors, score, and fuse.
 
@@ -36,15 +37,18 @@ def detect_document(
         ocr_provider: Specific OCR engine name.
         detector_names: Detectors to run, or ``None`` for all.
         values_only: Use per-value bounding boxes (redact the value, not the block).
+        password: Password for an encrypted PDF, if required.
 
     Returns:
         The parsed document, the fused detections, and a pipeline summary string.
 
     Raises:
         ValueError: If a detector name is unknown.
+        EncryptedPDFError: If the PDF is password-protected and no correct
+            password was supplied.
     """
     document, source = get_merged_document(
-        pdf, force_ocr=force_ocr, auto=auto, ocr_provider=ocr_provider
+        pdf, force_ocr=force_ocr, auto=auto, ocr_provider=ocr_provider, password=password
     )
     registry = build_registry(detector_names)
     result = registry.run_all(document, values_only=values_only)
@@ -63,6 +67,7 @@ def redact_document(
     ocr_provider: str | None = None,
     detector_names: list[str] | None = None,
     values_only: bool = True,
+    password: str | None = None,
 ) -> tuple[Path, list[Detection], str]:
     """Detect and redact *input_pdf* into *output_pdf*.
 
@@ -76,7 +81,8 @@ def redact_document(
         ocr_provider=ocr_provider,
         detector_names=detector_names,
         values_only=values_only,
+        password=password,
     )
     plan = RedactionPlanner().plan(document, detections, default_type=redaction_type)
-    out_path = PDFRenderer().render(input_pdf, output_pdf, plan)
+    out_path = PDFRenderer().render(input_pdf, output_pdf, plan, password=password)
     return out_path, detections, summary

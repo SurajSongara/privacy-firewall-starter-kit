@@ -8,6 +8,7 @@ from typing import Any, cast
 import fitz
 
 from privacy_firewall.engine.redaction import RedactionPlan, RedactionType
+from privacy_firewall.parsers.pdf_open import open_pdf
 
 
 class PDFRenderer:
@@ -46,24 +47,37 @@ class PDFRenderer:
         input_path: str | Path,
         output_path: str | Path,
         plan: RedactionPlan,
+        *,
+        password: str | None = None,
     ) -> Path:
         """Generate a redacted PDF copy.
 
         Redactions are applied directly to an in-memory copy of the source
         PDF, then saved to *output_path*. The original file is never touched.
+        An encrypted source is written out **unencrypted** — the redacted
+        copy is meant to be shared, so it must open without a password.
 
         Args:
             input_path: Path to the original PDF (never modified).
             output_path: Where to write the redacted copy.
             plan: The redaction plan to apply.
+            password: Password for an encrypted source PDF, if required.
 
         Returns:
             The absolute path to the output file.
+
+        Raises:
+            EncryptedPDFError: If the source is password-protected and no
+                correct password was supplied.
         """
-        doc = fitz.open(str(input_path))
+        doc = open_pdf(input_path, password=password)
         try:
+            was_encrypted = bool(doc.is_encrypted)
             self._apply_plan(doc, plan)
-            doc.save(str(output_path))
+            if was_encrypted:
+                doc.save(str(output_path), encryption=fitz.PDF_ENCRYPT_NONE)
+            else:
+                doc.save(str(output_path))
         finally:
             doc.close()
 

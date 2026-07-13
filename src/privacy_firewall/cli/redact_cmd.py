@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from privacy_firewall.cli._pdf import resolve_password
 from privacy_firewall.cli.scan_cmd import _safe
 from privacy_firewall.engine.decision import ReviewDecision, ReviewPlan, file_sha256
 from privacy_firewall.engine.ocr_pipeline import get_merged_document
@@ -12,6 +13,7 @@ from privacy_firewall.engine.redact import redact_document
 from privacy_firewall.engine.redaction import RedactionPlanner, RedactionType
 from privacy_firewall.engine.verification import certify
 from privacy_firewall.models.detection import Detection
+from privacy_firewall.parsers.pdf_open import EncryptedPDFError
 from privacy_firewall.renderer.pdf_renderer import PDFRenderer
 
 
@@ -97,6 +99,10 @@ def redact_cmd(
             help="Verify the output leaks no redacted PII and write an audit certificate.",
         ),
     ] = False,
+    password: Annotated[
+        str | None,
+        typer.Option("--password", help="Password for an encrypted (password-protected) PDF."),
+    ] = None,
 ) -> None:
     """Scan a PDF for PII and produce a redacted copy."""
     type_map: dict[str, RedactionType] = {
@@ -110,16 +116,17 @@ def redact_cmd(
         msg = f"Unknown redaction type: {redaction_type!r}. Choose from: {choices}"
         raise typer.BadParameter(msg)
 
-    if plan_path is not None:
-        detections = _resolve_from_plan(plan_path, input_pdf, interactive=interactive, yes=yes)
-        document, _ = get_merged_document(input_pdf)
-        pipeline_note = f"review plan ({plan_path.name})"
-        planner = RedactionPlanner()
-        plan = planner.plan(document, detections, default_type=rtype)
-        out_path = PDFRenderer().render(input_pdf, output_pdf, plan)
-        redaction_count = plan.total_redactions
-    else:
-        try:
+    pw = resolve_password(input_pdf, password)
+    try:
+        if plan_path is not None:
+            detections = _resolve_from_plan(plan_path, input_pdf, interactive=interactive, yes=yes)
+            document, _ = get_merged_document(input_pdf, password=pw)
+            pipeline_note = f"review plan ({plan_path.name})"
+            planner = RedactionPlanner()
+            plan = planner.plan(document, detections, default_type=rtype)
+            out_path = PDFRenderer().render(input_pdf, output_pdf, plan, password=pw)
+            redaction_count = plan.total_redactions
+        else:
             out_path, detections, pipeline_note = redact_document(
                 input_pdf,
                 output_pdf,
@@ -129,10 +136,14 @@ def redact_cmd(
                 ocr_provider=ocr_engine,
                 detector_names=detector,
                 values_only=values_only,
+                password=pw,
             )
-        except ValueError as exc:
-            raise typer.BadParameter(str(exc)) from exc
-        redaction_count = len(detections)
+            redaction_count = len(detections)
+    except EncryptedPDFError as exc:
+        typer.echo(f"Error: {_safe(str(exc))}", err=True)
+        raise typer.Exit(code=1) from exc
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
     typer.echo(f"Pipeline: {pipeline_note}")
     typer.echo(f"Redacted PDF saved to: {out_path}")
