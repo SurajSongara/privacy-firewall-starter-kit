@@ -12,6 +12,8 @@ pip install -e ".[dev]"
 python -m privacy_firewall scan   TestFiles/sbi_statement.pdf
 python -m privacy_firewall detect TestFiles/statement1-5.pdf --ocr
 python -m privacy_firewall redact input.pdf out.pdf --values-only
+python -m privacy_firewall redact input.pdf out.pdf --certificate  # verify + audit certificate
+python -m privacy_firewall redact-batch ./folder --out ./redacted  # whole-folder redaction + summary
 python -m privacy_firewall doctor  TestFiles/statement1-5.pdf     # combined diagnostics + layout + OCR recommendation
 python -m privacy_firewall diagnostics <pdf>                       # DocumentAnalyzer only
 
@@ -64,9 +66,11 @@ Module map (see `AGENTS.md` for the full per-file reference — it is the source
 - `models/` — frozen Pydantic dataclasses: `BoundingBox`, `Span`, `TextBlock`/`ImageBlock`/`TableBlock`, `Detection`, `Document`. Universal vocabulary — every other module depends on it.
 - `parsers/pdf_parser.py` — PyMuPDF; groups per-word `TextSpan`s from `page.get_text("words")` under blocks from `page.get_text("dict")`.
 - `ocr/` — `OCRProvider` ABC + `OCRProviderRegistry` singleton in `ocr/__init__.py` that auto-registers adapters at import time via try/except ImportError. Adapters: `TesseractOCRAdapter` (default), `PaddleOCRAdapter`, plus `rapid.py` and additional `tesseract.py` variants under `adapters/`.
-- `detectors/` — `BaseDetector` ABC + `DetectorRegistry`. Each detector: `PAN`, `Aadhaar`, `Email`, `Phone`, `UPI`, `IFSC`, `Account`. Deduplication helpers in `detectors/utils.py` (`is_exact_duplicate`, `is_containment_duplicate`). Detectors are pure: `(Document) → list[Detection]`; testable in isolation.
+- `detectors/` — `BaseDetector` ABC + `DetectorRegistry`. Each detector: `PAN`, `Aadhaar`, `Email`, `Phone`, `UPI`, `IFSC`, `Account`, `Name`, `GSTIN`. `ALL_DETECTORS` + `build_registry()` in `detectors/__init__.py` are the single source of truth for the detector set (used by CLI, pipeline, and verifier). Deduplication helpers in `detectors/utils.py` (`is_exact_duplicate`, `is_containment_duplicate`). Detectors are pure: `(Document) → list[Detection]`; testable in isolation.
 - `engine/fusion.py` — priority tiers `regex=5 > validator=4 > heuristic=3 > ner=2 > llm=1`; groups by `(page, detection_type)`, sorts by `(span.start, -priority, -confidence)`, merges overlapping neighbours.
 - `engine/redaction.py` — `RedactionType.{REPLACE, BLACK_BAR, HIGHLIGHT}`. REPLACE/BLACK_BAR use `page.add_redact_annot()` + `page.apply_redactions()` (physically strips from the content stream); HIGHLIGHT is a visual overlay only.
+- `engine/redact.py` — `detect_document()` / `redact_document()`: the detect→redact pipeline in one place, reused by `redact` and `redact-batch` (CLI stays a thin wrapper).
+- `engine/verification.py` — post-redaction proof: re-parses the output, asserts no redacted value is still extractable and no detector re-fires, and emits a `Certificate` (JSON + one-page PDF, no raw PII). `--certificate` on `redact`/`redact-batch`.
 - `engine/hybrid_merger.py` — merges native + OCR `Document`s, preferring native and adding OCR blocks whose bbox has IoU ≤ 0.5 with any native block.
 - `diagnostics/` — `DocumentAnalyzer` produces a `DiagnosticReport` with a weighted `TextQualityReport` (printable ratio 0.30, replacement chars 0.20, fragmentation 0.15, long tokens 0.20, whitespace 0.15) and a `PipelineSelector` decision (NATIVE / OCR / HYBRID).
 - `layout/analyzer.py` — classifies blocks into HEADER/FOOTER/PAGE_NUMBER/paragraphs by page position + vertical gap threshold.
