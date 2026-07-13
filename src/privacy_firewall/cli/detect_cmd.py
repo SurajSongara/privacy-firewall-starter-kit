@@ -5,17 +5,7 @@ from typing import Annotated
 
 import typer
 
-from privacy_firewall.detectors import (
-    AadhaarDetector,
-    AccountDetector,
-    DetectorRegistry,
-    EmailDetector,
-    IFSCDetector,
-    NameDetector,
-    PANDetector,
-    PhoneDetector,
-    UpiDetector,
-)
+from privacy_firewall.detectors import DetectorRegistry, build_registry
 from privacy_firewall.engine.context import ContextScorer
 from privacy_firewall.engine.decision import DecisionEngine, file_sha256
 from privacy_firewall.engine.fusion import FusionEngine
@@ -26,32 +16,19 @@ from privacy_firewall.policy import DEFAULT_POLICY_NAME, get_policy
 def _build_registry(detector_names: list[str] | None) -> DetectorRegistry:
     """Build a DetectorRegistry with the requested (or all) detectors.
 
+    Thin CLI wrapper around :func:`privacy_firewall.detectors.build_registry`
+    that surfaces an unknown-name error as a Typer parameter error.
+
     Args:
         detector_names: List of detector names to include, or ``None`` for all.
 
     Returns:
         A populated DetectorRegistry.
     """
-    all_detectors: dict[str, type] = {
-        "pan": PANDetector,
-        "aadhaar": AadhaarDetector,
-        "email": EmailDetector,
-        "phone": PhoneDetector,
-        "upi": UpiDetector,
-        "ifsc": IFSCDetector,
-        "account": AccountDetector,
-        "name": NameDetector,
-    }
-
-    registry = DetectorRegistry()
-    names = detector_names if detector_names else list(all_detectors)
-    for name in names:
-        cls = all_detectors.get(name)
-        if cls is None:
-            msg = f"Unknown detector: {name!r}. Available: {', '.join(sorted(all_detectors))}"
-            raise typer.BadParameter(msg)
-        registry.register(cls())
-    return registry
+    try:
+        return build_registry(detector_names)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def _engine_help() -> str:
