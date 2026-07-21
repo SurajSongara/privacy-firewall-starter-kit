@@ -23,6 +23,27 @@ Detect and physically remove sensitive information from PDFs, images, and text d
 
 ## Installation
 
+### Desktop app (no Python needed)
+
+Download the installer for your platform from the
+[latest release](https://github.com/SurajSongara/privacy-firewall-starter-kit/releases):
+
+| Platform | File | Notes |
+|---|---|---|
+| Windows | `PrivacyFirewall-Setup-<version>.exe` | Installs per-user; no admin rights required |
+| macOS | `PrivacyFirewall-<version>.dmg` | Drag to Applications |
+| Linux | `PrivacyFirewall-<version>-linux-x86_64.tar.gz` | Extract and run `./PrivacyFirewall` |
+
+Everything is bundled — Python, the PDF engine, and OCR for scanned documents.
+Launching the app opens the Studio dashboard in your browser on a
+`PrivacyFirewall` folder inside your Documents. The same binary is also a full
+CLI: `PrivacyFirewall detect statement.pdf`.
+
+> The installers are currently **unsigned**, so Windows SmartScreen shows an
+> "unrecognised app" warning and macOS Gatekeeper requires right-click → Open.
+
+### From source
+
 Requires **Python ≥ 3.12**.
 
 ```bash
@@ -163,3 +184,7 @@ python -m benchmarks.precision   # precision/recall vs. the golden corpus
 ## Privacy
 
 This tool exists to keep your documents private, and it practices what it preaches: no network calls, no telemetry, no cloud OCR. The web UI binds to `127.0.0.1` only. Everything — parsing, OCR, detection, redaction — runs locally.
+
+## License
+
+[GNU AGPL-3.0](LICENSE). The redaction engine links [PyMuPDF](https://pymupdf.readthedocs.io/), which is AGPL-licensed, so this project is too — if you distribute it (including as a hosted service or a packaged binary), you must make the corresponding source available. Build and packaging details are in [`packaging/README.md`](packaging/README.md).
