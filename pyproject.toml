@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,9 @@ name = "privacy-firewall"
 version = "0.1.0"
 description = "Offline-first PII Detection & Redaction Engine"
 requires-python = ">=3.12"
+# AGPL because the redaction engine links PyMuPDF (AGPL-3.0); see packaging/README.md.
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = [
     "pydantic>=2",
     "pymupdf>=1.24",
