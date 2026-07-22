@@ -29,6 +29,10 @@ ocr-lite = [
 ui = [
     "fastapi>=0.110",
     "uvicorn>=0.30",
+    # Required by Starlette the moment a route declares a file upload
+    # (studio.py's /api/upload uses UploadFile). Without it FastAPI raises at
+    # app-creation time, so the frozen bundle fails to start.
+    "python-multipart>=0.0.9",
 ]
 docx = [
     "python-docx>=1.1",

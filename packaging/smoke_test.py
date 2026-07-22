@@ -16,9 +16,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import fitz
@@ -82,6 +86,58 @@ def make_scanned_pdf(source: Path, path: Path) -> None:
     doc.close()
 
 
+def _free_port() -> int:
+    """Grab an OS-assigned free port, then release it for the child to bind."""
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return int(s.getsockname()[1])
+
+
+def check_studio(binary: Path, workspace: Path) -> None:
+    """Launch the Studio web server from the frozen bundle and hit it over HTTP.
+
+    This is the check that would catch a missing web dependency (e.g.
+    python-multipart, which Starlette imports lazily for the UploadFile upload
+    route). Such a failure raises at app-creation time, so the process exits
+    before the port ever opens -- which this check detects as a timeout.
+    """
+    port = _free_port()
+    url = f"http://127.0.0.1:{port}/"
+    proc = subprocess.Popen(
+        [str(binary), "--workspace", str(workspace), "--port", str(port), "--no-browser"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    try:
+        deadline = time.monotonic() + 60
+        status = 0
+        while time.monotonic() < deadline:
+            if proc.poll() is not None:  # server died during startup
+                break
+            try:
+                with urllib.request.urlopen(url, timeout=2) as resp:
+                    status = resp.status
+                break
+            except (urllib.error.URLError, ConnectionError, OSError):
+                time.sleep(0.5)
+        detail = ""
+        if status != 200:
+            if proc.poll() is not None and proc.stdout is not None:
+                detail = proc.stdout.read()
+            else:
+                detail = f"server did not answer on {url} within timeout"
+        check("Studio server starts and serves the dashboard", status == 200, detail)
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def main() -> int:
     """Run every smoke check; return a process exit code."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -140,7 +196,11 @@ def main() -> int:
                 text = "".join(page.get_text() for page in doc)
             check("redacted output no longer contains the PAN", "ABCPE1234F" not in text)
 
-        # 5. OCR: proves rapidocr models + onnxruntime natives were bundled.
+        # 5. Studio web server: proves the UI extra (fastapi/uvicorn/
+        #    python-multipart) is fully bundled and the app actually serves.
+        check_studio(binary, work)
+
+        # 6. OCR: proves rapidocr models + onnxruntime natives were bundled.
         if args.skip_ocr:
             print("  SKIP  OCR bundling check (--skip-ocr)")
         else:

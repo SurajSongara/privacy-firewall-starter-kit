@@ -58,6 +58,12 @@ datas += copy_metadata("privacy-firewall")
 # there are no template data files to collect.
 hiddenimports += collect_submodules("uvicorn")
 
+# python-multipart backs UploadFile in studio.py's /api/upload route. Starlette
+# imports it lazily (as "multipart" on older releases, "python_multipart" on
+# newer ones), so it is invisible to the import graph. Collect both names.
+hiddenimports += optional("multipart submodules", collect_submodules, "multipart")
+hiddenimports += optional("python_multipart submodules", collect_submodules, "python_multipart")
+
 # --- OCR --------------------------------------------------------------------
 # The most failure-prone dependency: the ONNX models and YAML configs ship as
 # package *data*, and onnxruntime's inference engine is a native library.
